@@ -11,19 +11,12 @@ import type { Metadata } from 'next';
 export const generateMetadata = async (): Promise<Metadata> => {
   const allCommittees: CommitteeType[] = await client.fetch(COMMITTEES_QUERY);
   const committeeNames = allCommittees.map(committee => committee.name).join(', ');
-  const description = `Explore the various committees at BORNOVAMUN'26: ${committeeNames}. Learn about each committee's focus and prepare for engaging debates.`;
+  const description = `Explore the various committees at BORNOVAMUN'26: ${committeeNames}.`;
 
   return {
     title: `Committees`,
     description: description,
-    keywords: [
-      "BORNOVAMUN'26",
-      "Committees",
-      committeeNames,
-      "MUN conference",
-      "Model United Nations",
-      "Bornova MUN"
-    ],
+    keywords: ["BORNOVAMUN'26", "Committees", committeeNames, "MUN"],
     openGraph: {
       title: `Committees`,
       description: description,
@@ -39,34 +32,32 @@ export const generateMetadata = async (): Promise<Metadata> => {
 
 const Committees = async () => {
   const allCommittees = await client.fetch(COMMITTEES_QUERY);
-
-  // Sort Committees by their ID in ascending order
   const sortedCommittees = [...allCommittees].sort((a, b) => (a.id || Infinity) - (b.id || Infinity));
 
   return (
-    <>
-      <div className="mx-auto pb-20 max-sm:pb-12">
-        <h1 className="text-6xl max-sm:text-3xl mt-16 max-sm:mt-8 text-center text-white font-bold">Committees</h1>
+    <div className="min-h-screen pb-20 overflow-hidden">
+      <div className="mx-auto container px-4">
+        <h1 className="text-6xl max-sm:text-4xl mt-20 mb-20 text-center text-white font-bold tracking-tight">
+          Committees
+        </h1>
 
-        {/* Combined responsive grid */}
-        <div className="grid place-items-center w-full grid-cols-2 sm:grid-cols-3 gap-6 sm:gap-16 px-4 sm:px-0 mt-12 sm:mt-16">
+        <div className="flex flex-col items-center gap-24 md:gap-32">
           {sortedCommittees.map((committee: CommitteeType, index) => (
-            <a
-              className="w-fit hover:scale-105 transition-transform duration-500"
-              href={`${committee.link || "/"}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              key={index}
-            >
-              <CommitteeCard
+             <CommitteeCard
+                key={index}
                 imageUrl={committee.imageUrl}
                 committeeName={committee.name}
+                slug={committee.slug}
+                // Pass full object if you want to extract description inside the card, 
+                // but currently your query fetches everything so this works.
+                // Assuming description is fetched in COMMITTEES_QUERY (added in previous step)
+                description={committee.description}
+                align={index % 2 !== 0 ? 'right' : 'left'}
               />
-            </a>
           ))}
         </div>
       </div>
-    </>
+    </div>
   );
 };
 

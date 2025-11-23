@@ -1,10 +1,13 @@
 // app/layout.tsx
 
-import type { Metadata } from "next";
-import "@/app/globals.css?inline";
-import { Analytics } from "@vercel/analytics/next";
-import { Montserrat } from "next/font/google";
-import Navbar from "@/components/Navbar";
+import type { Metadata } from "next"
+import "@/app/globals.css?inline"
+import { Analytics } from "@vercel/analytics/next"
+import { Montserrat } from "next/font/google"
+import Navbar from "@/components/Navbar"
+import Footer from "@/components/Footer"
+import Image from "next/image"
+import BackgroundAnimations from "@/components/BackgroundAnimations"
 
 // Initialize Montserrat font
 const montserrat = Montserrat({
@@ -12,7 +15,7 @@ const montserrat = Montserrat({
   display: "swap",
   variable: "--font-montserrat",
   style: ["normal", "italic"],
-});
+})
 
 export const metadata: Metadata = {
   title: {
@@ -93,12 +96,12 @@ export const metadata: Metadata = {
       noimageindex: false,
     },
   },
-};
+}
 
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode;
+  children: React.ReactNode
 }>) {
   return (
     <html
@@ -109,23 +112,29 @@ export default function RootLayout({
         className={`overflow-x-hidden max-w-screen ${montserrat.variable} ${montserrat.className} antialiased`}
         style={{ scrollbarWidth: "none" }}
       >
-        <div className="min-h-screen">
+        <div className="fixed inset-0 z-[-2]">
+            <Image
+                src="/trees.jpg" 
+                alt="Background" 
+                fill 
+                className="object-cover opacity-90" // Adjust opacity to blend with dark theme
+                priority
+                quality={85}
+            />
+            {/* Dark overlay to ensure text readability over the image */}
+            <div className="absolute inset-0 bg-[#0A1938]/90" />
+        </div>
+
+        {/* Global Particles */}
+        <BackgroundAnimations />
+
+        <div className="min-h-screen relative z-10">
           <Navbar />
           {children}
         </div>
-        <h3 className="text-white text-center min-[1800px]:text-xl">
-          © 2026 BORNOVAMUN, All Rights Reserved.{" "}
-          <br className="sm:hidden" />{" "}
-          <a
-            href="https://emre-bozkurt.netlify.app"
-            target="_blank"
-            className="underline cursor-pointer"
-          >
-            Emre Bozkurt
-          </a>
-        </h3>
+        <Footer />
         <Analytics />
       </body>
     </html>
-  );
+  )
 }

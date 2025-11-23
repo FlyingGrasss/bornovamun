@@ -2,13 +2,10 @@
 
 import Link from "next/link";
 import Countdown from "@/components/Countdown";
-import BackgroundAnimations from "@/components/BackgroundAnimations";
 
 export default function Home() {
   return (
     <div className="relative min-h-screen">
-      <div className="absolute inset-0 bg-[#0A1938] -z-10" />
-      <BackgroundAnimations />
       <main className="relative z-10 justify-center min-h-[85vh] flex flex-col items-center gap-12 max-sm:gap-6 px-4">
         <div className="text-center">
           <h1 className="text-[hsl(42,72%,52%)] text-7xl max-sm:text-[40px] tracking-tight font-bold mb-4">

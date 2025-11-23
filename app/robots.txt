@@ -2,4 +2,4 @@ User-Agent: *
 Allow: /
 Disallow: /studio
 
-Sitemap: https://dadyamun.org/sitemap.xml
+Sitemap: https://www.bornovamun.org/sitemap.xml

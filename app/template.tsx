@@ -8,8 +8,16 @@ import { usePathname } from "next/navigation";
 
 export default function Template({ children }: { children: React.ReactNode }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const pathname = usePathname();
+  const pathname = usePathname()
   const isFirstRender = useRef(true);
+
+  // Don't show navbar on studio routes
+  if (pathname?.startsWith('/studio')) {
+    return <>
+      {children};
+    </>
+  }
+
 
   useEffect(() => {
     if (!containerRef.current) return;

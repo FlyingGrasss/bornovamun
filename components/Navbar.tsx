@@ -10,8 +10,13 @@ import { usePathname } from "next/navigation";
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const pathname = usePathname();
-
+  const pathname = usePathname()
+  
+  // Don't show navbar on studio routes
+  if (pathname?.startsWith('/studio')) {
+    return null
+  }
+  
   const handleResize = () => {
     setIsMobile(window.innerWidth < 768);
   };

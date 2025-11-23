@@ -5,78 +5,106 @@
 import { useEffect, useRef } from "react";
 import { gsap } from "gsap";
 
+const CONFIG = {
+  PARTICLE_COUNT: 25,
+  MIN_SIZE: 0.2,
+  MAX_SIZE: 1,
+  MIN_DURATION: 12,
+  MAX_DURATION: 25,
+};
+
 const BackgroundAnimations = () => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const particlesRef = useRef<HTMLDivElement[]>([]);
 
   useEffect(() => {
     if (!containerRef.current) return;
-
-    // Create a pool of 20 particles
-    const particleCount = 20;
+    const container = containerRef.current;
+    
     const particles: HTMLDivElement[] = [];
 
-    for (let i = 0; i < particleCount; i++) {
+    // Initialize particles
+    for (let i = 0; i < CONFIG.PARTICLE_COUNT; i++) {
       const particle = document.createElement("div");
       particle.className = "particle";
-      particle.style.willChange = "transform, opacity";
-      containerRef.current.appendChild(particle);
+      particle.style.pointerEvents = "none";
+      // Crucial: Set initial opacity to 0 immediately via CSS or JS
+      particle.style.opacity = "0"; 
+      container.appendChild(particle);
       particles.push(particle);
     }
 
-    particlesRef.current = particles;
-
-    const animateParticle = (particle: HTMLDivElement) => {
-      // Spawn on edges
-      const side = Math.floor(Math.random() * 4);
+    const animateParticle = (particle: HTMLDivElement, isFirstRun: boolean = false) => {
       let startX, startY;
 
-      switch (side) {
-        case 0: // Top
-          startX = Math.random() * window.innerWidth;
-          startY = -10;
-          break;
-        case 1: // Right
-          startX = window.innerWidth + 10;
-          startY = Math.random() * window.innerHeight;
-          break;
-        case 2: // Bottom
-          startX = Math.random() * window.innerWidth;
-          startY = window.innerHeight + 10;
-          break;
-        default: // Left
-          startX = -10;
-          startY = Math.random() * window.innerHeight;
+      // Logic to determine start position
+      if (isFirstRun) {
+        // Randomly scatter on screen
+        startX = Math.random() * window.innerWidth;
+        startY = Math.random() * window.innerHeight;
+      } else {
+        // Spawn from random edge
+        const side = Math.floor(Math.random() * 4);
+        switch (side) {
+          case 0: // Top
+            startX = Math.random() * window.innerWidth;
+            startY = -20;
+            break;
+          case 1: // Right
+            startX = window.innerWidth + 20;
+            startY = Math.random() * window.innerHeight;
+            break;
+          case 2: // Bottom
+            startX = Math.random() * window.innerWidth;
+            startY = window.innerHeight + 20;
+            break;
+          default: // Left
+            startX = -20;
+            startY = Math.random() * window.innerHeight;
+        }
       }
 
+      // Immediately set properties to avoid 0,0 glitch
       gsap.set(particle, {
         x: startX,
         y: startY,
-        scale: 1,
-        opacity: 0.8,
+        scale: isFirstRun ? Math.random() * 0.5 + 0.5 : 0,
+        opacity: 0, 
       });
 
-      // Animate to center and fade (slower duration)
-      const endX = window.innerWidth * 0.5 + (Math.random() - 0.5) * 400;
-      const endY = window.innerHeight * 0.5 + (Math.random() - 0.5) * 400;
+      const endX = window.innerWidth * 0.5 + (Math.random() - 0.5) * 800;
+      const endY = window.innerHeight * 0.5 + (Math.random() - 0.5) * 800;
+      const duration = CONFIG.MIN_DURATION + Math.random() * (CONFIG.MAX_DURATION - CONFIG.MIN_DURATION);
 
-      gsap.to(particle, {
+      const tl = gsap.timeline({
+        onComplete: () => animateParticle(particle, false)
+      });
+
+      tl.to(particle, {
+        opacity: 0.6 + Math.random() * 0.4,
+        scale: Math.random() * (CONFIG.MAX_SIZE - CONFIG.MIN_SIZE) + CONFIG.MIN_SIZE,
+        duration: 3,
+        ease: "power1.inOut"
+      }, 0);
+
+      tl.to(particle, {
         x: endX,
         y: endY,
+        duration: duration,
+        ease: "none",
+      }, 0);
+
+      tl.to(particle, {
         opacity: 0,
-        scale: 0.2,
-        duration: 10 + Math.random() * 5,
-        ease: "power2.out",
-        onComplete: () => {
-          // Recycle particle
-          setTimeout(() => animateParticle(particle), Math.random() * 1000);
-        },
-      });
+        scale: 0,
+        duration: 4,
+        ease: "power2.in"
+      }, duration - 4);
     };
 
-    // Start animations with faster staggered delay
+    // Stagger start
     particles.forEach((particle, i) => {
-      setTimeout(() => animateParticle(particle), i * 200);
+      // Use set timeout to space out their entry
+      setTimeout(() => animateParticle(particle, true), Math.random() * 3000);
     });
 
     return () => {
