@@ -1,4 +1,4 @@
-// app/api/apply/[type]/route.ts
+/*// app/api/apply/[type]/route.ts
 
 import getMessage from '@/lib/getMessage';
 import { createClient } from '@supabase/supabase-js';
@@ -128,3 +128,5 @@ async function sendVerificationEmail(email: string, name: string, code: string, 
       html: htmlContent,
     });
 }
+
+*/

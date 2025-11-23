@@ -1,4 +1,4 @@
-// app/api/verify/[type]/route.ts
+/*// app/api/verify/[type]/route.ts
 
 import { supabase } from '@/lib/supabase';
 import { NextResponse } from 'next/server';
@@ -149,3 +149,5 @@ export async function POST(request: Request, { params }: { params: Promise<{ typ
     );
   }
 } 
+
+*/
