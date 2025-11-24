@@ -46,7 +46,7 @@ export const metadata: Metadata = {
     ],
     apple: [
       {
-        url: "/apple-touch-icon.png",
+        url: "/logo.png",
         sizes: "180x180",
         type: "image/png",
       },
@@ -62,7 +62,7 @@ export const metadata: Metadata = {
     siteName: "BORNOVAMUN'26",
     images: [
       {
-        url: "https://www.bornovamun.org/opengraph-image.jpg",
+        url: "https://www.bornovamun.org/icon.png",
         width: 1200,
         height: 630,
         alt: "BORNOVAMUN'26 - Bornova Model United Nations Conference",
@@ -78,7 +78,7 @@ export const metadata: Metadata = {
     title: "BORNOVAMUN'26 | Bornova Model United Nations",
     description:
       "16-17-18 Ocak 2026 | Join Turkey's leading MUN conference in Bornova.",
-    images: ["https://www.bornovamun.org/opengraph-image.jpg"],
+    images: ["https://www.bornovamun.org/icon.png"],
   },
 
   // Technical SEO
