@@ -21,19 +21,17 @@ const Apply = () => {
   return (
     <div className="min-h-screen py-20 px-4">
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-6xl max-sm:text-4xl mb-6 text-center text-[hsl(42,72%,52%)] font-bold">
+        <h1 className="text-6xl max-sm:text-4xl mb-16 text-center text-[hsl(42,72%,52%)] font-bold">
           Apply Now
         </h1>
-        <p className="text-center text-gray-300 text-xl mb-16 max-w-2xl mx-auto">
-          Choose your role and be part of the legacy. Join us at BORNOVAMUN'26 for an unforgettable experience.
-        </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 place-items-center">
           {applications.map((app) => (
             <Link
               key={app.id}
               href={`/apply/${app.id}`}
-              className="group relative w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_20px_40px_-15px_hsl(42,72%,52%,0.3)]"
+              // Added max-w-[300px] for mobile to prevent full screen width images
+              className="group relative w-full max-w-[300px] sm:max-w-sm rounded-3xl overflow-hidden shadow-2xl transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_20px_40px_-15px_hsl(42,72%,52%,0.3)]"
             >
               {/* Background Image */}
               <div className="relative h-[400px] w-full">

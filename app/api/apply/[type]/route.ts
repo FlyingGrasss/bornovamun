@@ -1,7 +1,7 @@
-/*// app/api/apply/[type]/route.ts
+// app/api/apply/[type]/route.ts
 
 import getMessage from '@/lib/getMessage';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase';
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { google } from 'googleapis';
@@ -12,13 +12,9 @@ interface RequestData {
   lang?: 'en' | 'tr';
 }
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
 const resend = new Resend(process.env.RESEND_API_KEY!);
 const SERVICE_ACCOUNT_KEY = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY!);
 
-// Map params.type to Env Variables for Sheet IDs
 const getSheetId = (type: string) => {
     switch(type) {
         case 'delegate': return process.env.GOOGLE_SHEET_ID_DELEGATE;
@@ -37,21 +33,51 @@ export async function POST(request: Request, { params }: { params: Promise<{ typ
     const { email, name, lang = 'en' } = data;
     const sheetId = getSheetId(type);
 
-    if (!sheetId) return NextResponse.json({ error: 'Invalid type' }, { status: 400 });
-
-    // Check if email exists in Google Sheet
-    // Note: Column index for email might vary, assuming col K (index 10) for individuals based on previous code. 
-    // For delegation, usually email is col B (index 1).
-    const emailColIndex = type === 'delegation' ? 1 : 10; // Adjust as needed
+    // 1. IP Rate Limiting Logic
+    const ip = request.headers.get('x-forwarded-for') || 'unknown';
     
-    const sheetResponse = await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/A2:Z1000?key=${SERVICE_ACCOUNT_KEY.private_key}`
+    // Check last verification attempt by this IP across all application types
+    const { data: recentAttempts } = await supabase
+        .from('verification_codes')
+        .select('created_at')
+        .eq('ip', ip)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+    if (recentAttempts) {
+        const lastAttempt = new Date(recentAttempts.created_at).getTime();
+        const now = Date.now();
+        if (now - lastAttempt < 60000) { // 60 seconds limit
+            return NextResponse.json(
+                { message: 'You have sent a verification email recently. Please wait 60 seconds before trying again.' },
+                { status: 429 }
+            );
+        }
+    }
+
+    if (!sheetId) return NextResponse.json({ error: 'Invalid application type.' }, { status: 400 });
+
+    // 2. Comprehensive Email Exists Check (Across ALL columns)
+    const authGoogle = new google.auth.GoogleAuth({
+      credentials: SERVICE_ACCOUNT_KEY,
+      scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'] // Use read-only scope for existence check
+    });
+    const sheets = google.sheets({ version: 'v4', auth: authGoogle });
+
+    const sheetResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: sheetId,
+      range: 'Sayfa1!A:Z', // Check all possible columns
+    });
+    
+    const values = sheetResponse.data.values || [];
+
+    // Check if the email exists in ANY column of ANY row
+    const emailExistsInSheet = values.some((row: string[]) => 
+        row.some(cell => cell && cell.toLowerCase() === email.toLowerCase())
     );
-    
-    const sheetData = await sheetResponse.json();
-    const values = sheetData.values || [];
 
-    if (values.some((row: string[]) => row[emailColIndex] === email)) {
+    if (emailExistsInSheet) {
       return NextResponse.json(
         { message: getMessage(lang, 'email_exists') },
         { status: 400 }
@@ -61,16 +87,24 @@ export async function POST(request: Request, { params }: { params: Promise<{ typ
     const code = Math.random().toString(36).substring(2, 8).toUpperCase();
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000); 
 
+    // 3. Store with IP
     const { error } = await supabase
       .from('verification_codes')
       .upsert({
         email,
         code,
         expires_at: expiresAt.toISOString(),
-        application_type: type
+        application_type: type,
+        ip: ip // Saving IP here
       });
 
-    if (error) throw error;
+    if (error) {
+        console.error('Supabase Upsert Error:', error);
+        return NextResponse.json(
+            { error: 'Failed to save verification data.' },
+            { status: 500 }
+        );
+    }
 
     await sendVerificationEmail(email, name, code, lang, type);
 
@@ -80,7 +114,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ typ
     );
 
   } catch (error) {
-    console.error('Error:', error);
+    console.error('API Apply Error:', error);
     return NextResponse.json(
       { error: 'Internal Server Error' },
       { status: 500 }
@@ -98,7 +132,7 @@ async function sendVerificationEmail(email: string, name: string, code: string, 
   const htmlContent = lang === 'en' 
     ? `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1 style="color: #hsl(42,72%,52%);">BORNOVAMUN'26 ${title} Application</h1>
+        <h1 style="color: #d1a030;">BORNOVAMUN'26 ${title} Application</h1>
         <p>Dear ${name},</p>
         <p>Thank you for applying!</p>
         <p>Your verification code is:</p>
@@ -110,7 +144,7 @@ async function sendVerificationEmail(email: string, name: string, code: string, 
     `
     : `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1 style="color: #hsl(42,72%,52%);">BORNOVAMUN'26 ${title} Başvurusu</h1>
+        <h1 style="color: #d1a030;">BORNOVAMUN'26 ${title} Başvurusu</h1>
         <p>Sayın ${name},</p>
         <p>Başvurunuz için teşekkürler!</p>
         <p>Doğrulama kodunuz:</p>
@@ -121,12 +155,14 @@ async function sendVerificationEmail(email: string, name: string, code: string, 
       </div>
     `;
 
-    await resend.emails.send({
+    const { error: resendError } = await resend.emails.send({
       from: `BORNOVAMUN Team <${fromEmail}>`,
       to: email,
       subject: emailSubject,
       html: htmlContent,
     });
+    
+    if (resendError) {
+        console.error('Resend Email Error:', resendError);
+    }
 }
-
-*/

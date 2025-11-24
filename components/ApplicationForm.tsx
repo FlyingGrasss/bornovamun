@@ -2,9 +2,10 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
-// Define the full combined state interface
+// --- Interfaces ---
 interface FormData {
   // Common / Personal
   fullName: string;
@@ -76,8 +77,59 @@ const ApplicationForm = ({ applicationType }: { applicationType: string }) => {
   const [formsGenerated, setFormsGenerated] = useState(false);
   const [verificationModalOpen, setVerificationModalOpen] = useState(false);
   const [verificationCode, setVerificationCode] = useState('');
-  const [message, setMessage] = useState({ text: '', isError: false });
+  // Use a separate message state for the modal to avoid conflicts
+  const [mainPageMessage, setMainPageMessage] = useState({ text: '', isError: false }); 
+  const [modalMessage, setModalMessage] = useState({ text: '', isError: false });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  // Handle Portal Mounting
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // --- Local Storage Logic ---
+
+  // 1. Load from Local Storage on Mount
+  useEffect(() => {
+    const savedData = localStorage.getItem(`bornova_form_${applicationType}`);
+    const savedDelegates = localStorage.getItem(`bornova_form_delegates_${applicationType}`);
+    
+    if (savedData) {
+      try {
+        const parsed = JSON.parse(savedData);
+        setFormData(parsed);
+        // If delegation forms were previously generated, restore that state
+        if (parsed.numberOfDelegates >= 8 && applicationType === 'delegation') {
+            setFormsGenerated(true);
+        }
+      } catch (e) { console.error("Failed to load saved form", e); }
+    }
+
+    if (savedDelegates && applicationType === 'delegation') {
+        try {
+            setDelegates(JSON.parse(savedDelegates));
+            setFormsGenerated(true);
+        } catch (e) { console.error("Failed to load saved delegates", e); }
+    }
+
+    setIsLoaded(true);
+  }, [applicationType]);
+
+  // 2. Save to Local Storage on Change (Debounced)
+  useEffect(() => {
+    if (isLoaded) {
+        const timeout = setTimeout(() => {
+            localStorage.setItem(`bornova_form_${applicationType}`, JSON.stringify(formData));
+            if (applicationType === 'delegation' && delegates.length > 0) {
+                localStorage.setItem(`bornova_form_delegates_${applicationType}`, JSON.stringify(delegates));
+            }
+        }, 500); // 500ms debounce
+        return () => clearTimeout(timeout);
+    }
+  }, [formData, delegates, applicationType, isLoaded]);
+
 
   // --- Handlers ---
 
@@ -97,18 +149,27 @@ const ApplicationForm = ({ applicationType }: { applicationType: string }) => {
 
   const handleGenerateForms = () => {
     if (formData.numberOfDelegates < 8) {
-      setMessage({ text: 'Minimum number of delegates is 8', isError: true });
+      setMainPageMessage({ text: 'Minimum number of delegates is 8', isError: true });
       return;
     }
-    // Generate full form objects for each delegate
-    setDelegates(Array(formData.numberOfDelegates).fill({
+    
+    // If we already have delegates in state (from localstorage), preserve them if count matches
+    if (delegates.length === formData.numberOfDelegates && formsGenerated) {
+        setFormsGenerated(true);
+        setMainPageMessage({ text: '', isError: false });
+        return;
+    }
+
+    const newDelegates = Array(formData.numberOfDelegates).fill({
        fullName: '', birthDate: '', phoneNumber: '', email: '', nationalId: '',
        gender: '', grade: '', city: '', accomodation: '', motivationLetter: '',
        experience: '', committeePreferences: ['', '', ''], additionalInfo: '',
        englishLevel: '', dietaryPreferences: ''
-    }));
+    });
+
+    setDelegates(newDelegates);
     setFormsGenerated(true);
-    setMessage({ text: '', isError: false });
+    setMainPageMessage({ text: '', isError: false });
   };
 
   const handleDelegateMemberChange = (index: number, field: string, value: string) => {
@@ -128,12 +189,11 @@ const ApplicationForm = ({ applicationType }: { applicationType: string }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    setMessage({ text: '', isError: false });
+    setMainPageMessage({ text: '', isError: false }); // Clear main page message
+    setModalMessage({text: '', isError: false}); // Clear modal message
 
-    // For delegation, we primarily use School Name as the identifier in the first step
     const name = applicationType === 'delegation' ? formData.school : formData.fullName;
     
-    // Payload for first step is minimal
     const body = {
       email: formData.email,
       name: name,
@@ -148,11 +208,24 @@ const ApplicationForm = ({ applicationType }: { applicationType: string }) => {
       });
 
       const result = await response.json();
-      if (!response.ok) throw new Error(result.message || 'Failed to submit');
-      setMessage({ text: result.message, isError: false });
+      if (!response.ok) {
+        // If it's a specific error (like email_exists or rate limit), show it on main page
+        if (response.status === 400 || response.status === 429) {
+          setMainPageMessage({ text: result.message || 'Error occurred', isError: true });
+        } else {
+          // Other errors might still go to modal or default error
+          setModalMessage({ text: result.message || 'Failed to submit application', isError: true });
+        }
+        throw new Error(result.message || 'Failed to submit');
+      }
+      setMainPageMessage({ text: result.message, isError: false }); // Usually "Verification email sent"
       setVerificationModalOpen(true);
     } catch (error) {
-      setMessage({ text: error instanceof Error ? error.message : 'Error', isError: true });
+      // If error already handled for main page, do nothing here.
+      // Otherwise, set a generic error on main page.
+      if (!mainPageMessage.text) { 
+          setMainPageMessage({ text: error instanceof Error ? error.message : 'An unexpected error occurred', isError: true });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -161,16 +234,16 @@ const ApplicationForm = ({ applicationType }: { applicationType: string }) => {
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setModalMessage({ text: '', isError: false }); // Clear previous modal message
     
-    // Construct full payload based on type
     let verificationBody: any = { code: verificationCode, lang: 'en', ...formData };
     
     if(applicationType === 'delegation') {
         verificationBody = {
             school: formData.school,
-            email: formData.email, // Advisor/Contact Email
+            email: formData.email, 
             numberOfDelegates: formData.numberOfDelegates,
-            delegates: delegates, // Send the full array of delegates
+            delegates: delegates, 
             code: verificationCode,
             lang: 'en'
         };
@@ -183,16 +256,24 @@ const ApplicationForm = ({ applicationType }: { applicationType: string }) => {
         body: JSON.stringify(verificationBody)
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.message || 'Failed');
+      if (!response.ok) {
+        setModalMessage({ text: result.message || 'Verification failed. Please check your code.', isError: true });
+        throw new Error(result.message || 'Failed');
+      }
+      
+      // Clear local storage on success
+      localStorage.removeItem(`bornova_form_${applicationType}`);
+      localStorage.removeItem(`bornova_form_delegates_${applicationType}`);
+      
       window.location.href = '/success';
     } catch (error) {
-      setMessage({ text: error instanceof Error ? error.message : 'Error', isError: true });
+      // Message already set in modalMessage state for display
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // --- Renders ---
+  // --- Render Parts ---
   
   const titleMap: Record<string, string> = {
     delegate: "Delegate Application",
@@ -208,35 +289,36 @@ const ApplicationForm = ({ applicationType }: { applicationType: string }) => {
            <label className="block text-white text-sm font-medium mb-2">
              {applicationType === 'delegation' ? 'School Name *' : 'Full Name *'}
            </label>
-           <input type="text" name={applicationType === 'delegation' ? 'school' : 'fullName'} value={applicationType === 'delegation' ? formData.school : formData.fullName} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white" required />
+           <input type="text" name={applicationType === 'delegation' ? 'school' : 'fullName'} value={applicationType === 'delegation' ? formData.school : formData.fullName} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required />
         </div>
         
         {applicationType !== 'delegation' && (
             <>
-                <div><label className="block text-white text-sm font-medium mb-2">Birth Date *</label><input type="date" name="birthDate" value={formData.birthDate} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white" required /></div>
-                <div><label className="block text-white text-sm font-medium mb-2">Phone Number *</label><input type="tel" name="phoneNumber" value={formData.phoneNumber} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white" required /></div>
+                <div><label className="block text-white text-sm font-medium mb-2">Birth Date *</label><input type="date" name="birthDate" value={formData.birthDate} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required /></div>
+                <div><label className="block text-white text-sm font-medium mb-2">Phone Number *</label><input type="tel" name="phoneNumber" value={formData.phoneNumber} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required /></div>
             </>
         )}
 
-        <div><label className="block text-white text-sm font-medium mb-2">{applicationType === 'delegation' ? 'Contact Email *' : 'Email Address *'}</label><input type="email" name="email" value={formData.email} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white" required /></div>
+        <div><label className="block text-white text-sm font-medium mb-2">{applicationType === 'delegation' ? 'Contact Email *' : 'Email Address *'}</label><input type="email" name="email" value={formData.email} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required /></div>
 
         {applicationType !== 'delegation' && (
             <>
-                <div><label className="block text-white text-sm font-medium mb-2">National ID *</label><input type="text" name="nationalId" value={formData.nationalId} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white" required /></div>
+                <div><label className="block text-white text-sm font-medium mb-2">National ID *</label><input type="text" name="nationalId" value={formData.nationalId} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required /></div>
                 <div>
                     <label className="block text-white text-sm font-medium mb-2">Gender *</label>
-                    <select name="gender" value={formData.gender} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white" required>
+                    <select name="gender" value={formData.gender} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required>
                         <option value="">Select gender</option>
                         <option value="Male">Male</option>
                         <option value="Female">Female</option>
                         <option value="Other">Other</option>
                     </select>
                 </div>
-                <div><label className="block text-white text-sm font-medium mb-2">School Name *</label><input type="text" name="school" value={formData.school} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white" required /></div>
+                <div><label className="block text-white text-sm font-medium mb-2">School Name *</label><input type="text" name="school" value={formData.school} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required /></div>
                 <div>
                     <label className="block text-white text-sm font-medium mb-2">Grade/Level *</label>
-                    <select name="grade" value={formData.grade} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white" required>
+                    <select name="grade" value={formData.grade} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required>
                          <option value="">Select grade</option>
+                         <option value="Preparation Grade">Preparation</option>
                          <option value="9th Grade">9th Grade</option>
                          <option value="10th Grade">10th Grade</option>
                          <option value="11th Grade">11th Grade</option>
@@ -244,7 +326,7 @@ const ApplicationForm = ({ applicationType }: { applicationType: string }) => {
                          <option value="Graduate">Graduate</option>
                     </select>
                 </div>
-                <div><label className="block text-white text-sm font-medium mb-2">City *</label><input type="text" name="city" value={formData.city} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white" required /></div>
+                <div><label className="block text-white text-sm font-medium mb-2">City *</label><input type="text" name="city" value={formData.city} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required /></div>
             </>
         )}
     </div>
@@ -252,8 +334,8 @@ const ApplicationForm = ({ applicationType }: { applicationType: string }) => {
 
   const detailFields = (
      <div className="space-y-6">
-        <div><label className="block text-white text-sm font-medium mb-2">Motivation Letter *</label><textarea name="motivationLetter" value={formData.motivationLetter} onChange={handleInputChange} rows={5} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white resize-none" required /></div>
-        <div><label className="block text-white text-sm font-medium mb-2">Experience</label><textarea name="experience" value={formData.experience} onChange={handleInputChange} rows={4} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white resize-none" /></div>
+        <div><label className="block text-white text-sm font-medium mb-2">Motivation Letter *</label><textarea name="motivationLetter" value={formData.motivationLetter} onChange={handleInputChange} rows={5} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white resize-none focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required /></div>
+        <div><label className="block text-white text-sm font-medium mb-2">Experience</label><textarea name="experience" value={formData.experience} onChange={handleInputChange} rows={4} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white resize-none focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" /></div>
 
         {applicationType === 'delegate' && (
             <>
@@ -261,7 +343,7 @@ const ApplicationForm = ({ applicationType }: { applicationType: string }) => {
                     <label className="block text-white text-sm font-medium mb-2">Committee Preferences (Top 3) *</label>
                     <div className="space-y-3">
                          {[0,1,2].map(idx => (
-                             <select key={idx} value={formData.committeePreferences[idx]} onChange={(e) => handleCommitteeChange(idx, e.target.value)} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white" required={idx === 0}>
+                             <select key={idx} value={formData.committeePreferences[idx]} onChange={(e) => handleCommitteeChange(idx, e.target.value)} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required={idx === 0}>
                                  <option value="">{idx + 1}. Choice</option>
                                  <option value="UNICEF">UNICEF</option>
                                  <option value="UNODC">UNODC</option>
@@ -274,23 +356,24 @@ const ApplicationForm = ({ applicationType }: { applicationType: string }) => {
                 </div>
                 <div>
                     <label className="block text-white text-sm font-medium mb-2">English Level *</label>
-                    <select name="englishLevel" value={formData.englishLevel} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white" required>
+                    <select name="englishLevel" value={formData.englishLevel} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required>
                          <option value="">Select Level</option>
                          <option value="Beginner">Beginner</option>
                          <option value="Intermediate">Intermediate</option>
                          <option value="Advanced">Advanced</option>
+                         <option value="Native">Native</option>
                     </select>
                 </div>
             </>
         )}
 
         {applicationType === 'press' && (
-             <div><label className="block text-white text-sm font-medium mb-2">Camera Model</label><input name="camera" value={formData.camera} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white" /></div>
+             <div><label className="block text-white text-sm font-medium mb-2">Camera Model</label><input name="camera" value={formData.camera} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" /></div>
         )}
 
         <div>
             <label className="block text-white text-sm font-medium mb-2">Accommodation Needed? *</label>
-            <select name="accomodation" value={formData.accomodation} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white" required>
+            <select name="accomodation" value={formData.accomodation} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required>
                  <option value="">Select</option>
                  <option value="Yes">Yes</option>
                  <option value="No">No</option>
@@ -299,16 +382,18 @@ const ApplicationForm = ({ applicationType }: { applicationType: string }) => {
 
         <div>
              <label className="block text-white text-sm font-medium mb-2">Dietary Preferences</label>
-             <select name="dietaryPreferences" value={formData.dietaryPreferences} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white">
+             <select name="dietaryPreferences" value={formData.dietaryPreferences} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all">
                  <option value="">None</option>
                  <option value="Vegetarian">Vegetarian</option>
                  <option value="Vegan">Vegan</option>
                  <option value="Halal">Halal</option>
                  <option value="Kosher">Kosher</option>
+                 <option value="Gluten-free">Gluten-free</option>
+                 <option value="Dairy-free">Dairy-free</option>
              </select>
         </div>
 
-        <div><label className="block text-white text-sm font-medium mb-2">Additional Info</label><textarea name="additionalInfo" value={formData.additionalInfo} onChange={handleInputChange} rows={3} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white resize-none" /></div>
+        <div><label className="block text-white text-sm font-medium mb-2">Additional Info</label><textarea name="additionalInfo" value={formData.additionalInfo} onChange={handleInputChange} rows={3} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white resize-none focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" /></div>
      </div>
   );
 
@@ -321,12 +406,6 @@ const ApplicationForm = ({ applicationType }: { applicationType: string }) => {
           </h1>
         </div>
 
-        {message.text && (
-          <div className={`mb-6 p-4 rounded-lg ${message.isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-            {message.text}
-          </div>
-        )}
-
         <form onSubmit={handleSubmit} className="space-y-8">
           <div className="bg-gray-800 rounded-xl p-8 shadow-2xl">
             <h2 className="text-2xl font-semibold mb-6 text-[hsl(42,72%,52%)]">
@@ -337,7 +416,7 @@ const ApplicationForm = ({ applicationType }: { applicationType: string }) => {
             {applicationType === 'delegation' && (
                 <div className="mt-6">
                     <label className="block text-white text-sm font-medium mb-2">Number of Delegates * (Min 8)</label>
-                    <input type="number" name="numberOfDelegates" value={formData.numberOfDelegates} onChange={handleInputChange} min="8" className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white" required />
+                    <input type="number" name="numberOfDelegates" value={formData.numberOfDelegates} onChange={handleInputChange} min="8" className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required />
                     <button type="button" onClick={handleGenerateForms} className="mt-4 px-6 py-3 bg-[hsl(42,72%,52%)] text-[#0A1938] font-bold rounded-lg hover:bg-white transition-colors cursor-pointer">
                         Generate Forms
                     </button>
@@ -352,51 +431,59 @@ const ApplicationForm = ({ applicationType }: { applicationType: string }) => {
               </div>
           )}
 
+          {/* Delegation Loop */}
           {applicationType === 'delegation' && formsGenerated && (
               <div className="space-y-8">
                   {delegates.map((d, i) => (
                       <div key={i} className="bg-gray-800 rounded-xl p-8 shadow-xl border-l-4 border-[hsl(42,72%,52%)]">
                            <h3 className="text-xl font-bold text-white mb-6">Delegate #{i + 1}</h3>
                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <input placeholder="Full Name" value={d.fullName} onChange={e => handleDelegateMemberChange(i, 'fullName', e.target.value)} className="bg-gray-700 p-3 rounded text-white" required />
-                                <input placeholder="Email" type="email" value={d.email} onChange={e => handleDelegateMemberChange(i, 'email', e.target.value)} className="bg-gray-700 p-3 rounded text-white" required />
-                                <input placeholder="Phone" type="tel" value={d.phoneNumber} onChange={e => handleDelegateMemberChange(i, 'phoneNumber', e.target.value)} className="bg-gray-700 p-3 rounded text-white" required />
-                                <input placeholder="National ID" value={d.nationalId} onChange={e => handleDelegateMemberChange(i, 'nationalId', e.target.value)} className="bg-gray-700 p-3 rounded text-white" required />
-                                <input placeholder="Birth Date" type="date" value={d.birthDate} onChange={e => handleDelegateMemberChange(i, 'birthDate', e.target.value)} className="bg-gray-700 p-3 rounded text-white" required />
+                                <input placeholder="Full Name *" value={d.fullName} onChange={e => handleDelegateMemberChange(i, 'fullName', e.target.value)} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required />
+                                <input placeholder="Email *" type="email" value={d.email} onChange={e => handleDelegateMemberChange(i, 'email', e.target.value)} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required />
+                                <input placeholder="Phone *" type="tel" value={d.phoneNumber} onChange={e => handleDelegateMemberChange(i, 'phoneNumber', e.target.value)} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required />
+                                <input placeholder="National ID *" value={d.nationalId} onChange={e => handleDelegateMemberChange(i, 'nationalId', e.target.value)} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required />
+                                <input placeholder="Birth Date *" type="date" value={d.birthDate} onChange={e => handleDelegateMemberChange(i, 'birthDate', e.target.value)} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required />
                                 
-                                <select value={d.gender} onChange={e => handleDelegateMemberChange(i, 'gender', e.target.value)} className="bg-gray-700 p-3 rounded text-white" required>
-                                    <option value="">Select Gender</option><option value="Male">Male</option><option value="Female">Female</option>
+                                <select value={d.gender} onChange={e => handleDelegateMemberChange(i, 'gender', e.target.value)} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required>
+                                    <option value="">Select Gender *</option><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option>
                                 </select>
-                                <select value={d.grade} onChange={e => handleDelegateMemberChange(i, 'grade', e.target.value)} className="bg-gray-700 p-3 rounded text-white" required>
-                                    <option value="">Select Grade</option><option value="9th Grade">9th Grade</option><option value="10th Grade">10th Grade</option><option value="11th Grade">11th Grade</option><option value="12th Grade">12th Grade</option>
+                                <select value={d.grade} onChange={e => handleDelegateMemberChange(i, 'grade', e.target.value)} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required>
+                                    <option value="">Select Grade *</option><option value="Preparation Grade">Preparation</option><option value="9th Grade">9th Grade</option><option value="10th Grade">10th Grade</option><option value="11th Grade">11th Grade</option><option value="12th Grade">12th Grade</option><option value="Graduate">Graduate</option>
                                 </select>
-                                <input placeholder="City" value={d.city} onChange={e => handleDelegateMemberChange(i, 'city', e.target.value)} className="bg-gray-700 p-3 rounded text-white" required />
+                                <input placeholder="City *" value={d.city} onChange={e => handleDelegateMemberChange(i, 'city', e.target.value)} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required />
                                 
-                                <select value={d.accomodation} onChange={e => handleDelegateMemberChange(i, 'accomodation', e.target.value)} className="bg-gray-700 p-3 rounded text-white" required>
-                                    <option value="">Accommodation?</option><option value="Yes">Yes</option><option value="No">No</option>
+                                <select value={d.accomodation} onChange={e => handleDelegateMemberChange(i, 'accomodation', e.target.value)} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required>
+                                    <option value="">Accommodation? *</option><option value="Yes">Yes</option><option value="No">No</option>
                                 </select>
 
                                 <div className="md:col-span-2 space-y-2">
-                                    <label className="text-white text-sm">Committee Preferences</label>
+                                    <label className="text-white text-sm">Committee Preferences *</label>
                                     {[0,1,2].map(idx => (
-                                        <select key={idx} value={d.committeePreferences[idx]} onChange={e => handleMemberCommitteeChange(i, idx, e.target.value)} className="w-full bg-gray-700 p-3 rounded text-white" required={idx === 0}>
+                                        <select key={idx} value={d.committeePreferences[idx]} onChange={e => handleMemberCommitteeChange(i, idx, e.target.value)} className="w-full bg-gray-700 p-3 rounded text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required={idx === 0}>
                                             <option value="">{idx + 1}. Choice</option><option value="UNICEF">UNICEF</option><option value="UNODC">UNODC</option><option value="TDT">TDT</option><option value="CERN">CERN</option><option value="H-UNSC">H-UNSC</option>
                                         </select>
                                     ))}
                                 </div>
-                                <select value={d.englishLevel} onChange={e => handleDelegateMemberChange(i, 'englishLevel', e.target.value)} className="bg-gray-700 p-3 rounded text-white" required>
-                                    <option value="">English Level</option><option value="Beginner">Beginner</option><option value="Intermediate">Intermediate</option><option value="Advanced">Advanced</option>
+                                <select value={d.englishLevel} onChange={e => handleDelegateMemberChange(i, 'englishLevel', e.target.value)} className="bg-gray-700 p-3 rounded text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required>
+                                    <option value="">English Level *</option><option value="Beginner">Beginner</option><option value="Intermediate">Intermediate</option><option value="Advanced">Advanced</option><option value="Native">Native</option>
                                 </select>
-                                <select value={d.dietaryPreferences} onChange={e => handleDelegateMemberChange(i, 'dietaryPreferences', e.target.value)} className="bg-gray-700 p-3 rounded text-white">
-                                    <option value="">Dietary Prefs</option><option value="Vegetarian">Vegetarian</option><option value="Vegan">Vegan</option>
+                                <select value={d.dietaryPreferences} onChange={e => handleDelegateMemberChange(i, 'dietaryPreferences', e.target.value)} className="bg-gray-700 p-3 rounded text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all">
+                                    <option value="">Dietary Prefs</option><option value="Vegetarian">Vegetarian</option><option value="Vegan">Vegan</option><option value="Halal">Halal</option><option value="Kosher">Kosher</option><option value="Gluten-free">Gluten-free</option><option value="Dairy-free">Dairy-free</option>
                                 </select>
 
-                                <textarea placeholder="Experience" value={d.experience} onChange={e => handleDelegateMemberChange(i, 'experience', e.target.value)} className="md:col-span-2 bg-gray-700 p-3 rounded text-white resize-none" rows={3} />
-                                <textarea placeholder="Motivation Letter *" value={d.motivationLetter} onChange={e => handleDelegateMemberChange(i, 'motivationLetter', e.target.value)} className="md:col-span-2 bg-gray-700 p-3 rounded text-white resize-none" rows={4} required />
+                                <textarea placeholder="Experience" value={d.experience} onChange={e => handleDelegateMemberChange(i, 'experience', e.target.value)} className="md:col-span-2 bg-gray-700 p-3 rounded text-white resize-none focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" rows={3} />
+                                <textarea placeholder="Motivation Letter *" value={d.motivationLetter} onChange={e => handleDelegateMemberChange(i, 'motivationLetter', e.target.value)} className="md:col-span-2 bg-gray-700 p-3 rounded text-white resize-none focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" rows={4} required />
+                                <textarea placeholder="Additional Info" value={d.additionalInfo} onChange={e => handleDelegateMemberChange(i, 'additionalInfo', e.target.value)} className="md:col-span-2 bg-gray-700 p-3 rounded text-white resize-none focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" rows={2} />
                            </div>
                       </div>
                   ))}
               </div>
+          )}
+
+          {mainPageMessage.text && (
+            <div className={`mb-6 p-4 rounded-lg ${mainPageMessage.isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+              {mainPageMessage.text}
+            </div>
           )}
 
           {(applicationType !== 'delegation' || formsGenerated) && (
@@ -404,7 +491,7 @@ const ApplicationForm = ({ applicationType }: { applicationType: string }) => {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className={`group glassmorphism text-xl max-sm:text-base cursor-pointer items-center transition-all duration-300 justify-center gap-4 max-sm:gap-2 inline-flex backdrop-blur-md rounded-full px-8 py-4 max-sm:px-6 max-sm:py-3 shadow-lg ${isSubmitting ? 'opacity-50' : ''}`}
+                  className={`group glassmorphism text-xl max-sm:text-base cursor-pointer items-center transition-all duration-300 justify-center gap-4 max-sm:gap-2 inline-flex backdrop-blur-md rounded-full px-8 py-4 max-sm:px-6 max-sm:py-3 shadow-lg ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   {isSubmitting ? 'Submitting...' : 'Submit Application'}
                   <svg
@@ -426,18 +513,49 @@ const ApplicationForm = ({ applicationType }: { applicationType: string }) => {
               </div>
           )}
         </form>
+        
 
-        {verificationModalOpen && (
-           <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-             <div className="bg-[#0B1A39] border border-[hsl(42,72%,52%)] p-8 rounded-2xl max-w-md w-full">
-               <h2 className="text-2xl font-bold mb-4 text-[hsl(42,72%,52%)]">Verify Email</h2>
-               <p className="mb-4 text-white">Code sent to {formData.email}</p>
-               <form onSubmit={handleVerify}>
-                 <input type="text" value={verificationCode} onChange={(e) => setVerificationCode(e.target.value)} className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white mb-4" placeholder="Enter code" required />
-                 <button type="submit" className="w-full px-4 py-3 cursor-pointer bg-[hsl(42,72%,52%)] text-[#0A1938] font-bold rounded-lg hover:bg-white transition-colors">Verify</button>
+        {mounted && verificationModalOpen && createPortal(
+           <div className="fixed inset-0 z-9999 flex items-center justify-center bg-[#0B1A39] h-screen w-screen touch-none overscroll-none">
+             <div className="bg-[#0A1938] border-2 border-[hsl(42,72%,52%)] p-8 rounded-3xl max-w-md w-[90%] shadow-2xl flex flex-col gap-4 animate-in fade-in zoom-in duration-300">
+               <h2 className="text-3xl font-bold text-[hsl(42,72%,52%)] text-center">Verify Email</h2>
+               <p className="text-gray-300 text-center">
+                 We've sent a verification code to <span className="text-white font-semibold">{formData.email}</span>.
+               </p>
+               
+               {/* MODAL ERROR MESSAGE DISPLAY */}
+               {modalMessage.text && (
+                 <div className={`mt-2 p-3 rounded-lg text-center ${modalMessage.isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                   {modalMessage.text}
+                 </div>
+               )}
+
+               <form onSubmit={handleVerify} className="flex flex-col gap-4 mt-2">
+                 <input 
+                    type="text" 
+                    value={verificationCode} 
+                    onChange={(e) => setVerificationCode(e.target.value)} 
+                    className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl text-white text-center text-2xl tracking-widest focus:border-[hsl(42,72%,52%)] focus:outline-none transition-colors" 
+                    placeholder="CODE" 
+                    required 
+                 />
+                 
+                 <button 
+                    type="submit" 
+                    disabled={isSubmitting}
+                    className={`w-full px-4 py-4 cursor-pointer bg-[hsl(42,72%,52%)] text-[#0A1938] font-bold text-xl rounded-xl hover:bg-white transition-all active:scale-95 ${isSubmitting ? 'opacity-70' : ''}`}
+                 >
+                    {isSubmitting ? (
+                        <span className="flex items-center justify-center gap-2">
+                            <span className="animate-spin h-5 w-5 border-2 border-[#0A1938] border-t-transparent rounded-full"></span>
+                            Verifying...
+                        </span>
+                    ) : 'Verify Code'}
+                 </button>
                </form>
              </div>
-           </div>
+           </div>,
+           document.body
         )}
       </div>
     </div>

@@ -1,4 +1,4 @@
-/*// app/api/verify/[type]/route.ts
+// app/api/verify/[type]/route.ts
 
 import { supabase } from '@/lib/supabase';
 import { NextResponse } from 'next/server';
@@ -46,40 +46,33 @@ export async function POST(request: Request, { params }: { params: Promise<{ typ
       );
     }
 
-    // Format Data for Sheet based on Type
     let values: any[][] = [];
 
     if (type === 'delegation') {
-        // Special Handling for Delegation: Map over the delegates array
-        // Expecting formData.delegates and formData.school
         if (Array.isArray(formData.delegates)) {
             values = formData.delegates.map((d: any) => [
-                formData.school,        // 0. School Name (Group ID)
-                email,                  // 1. Advisor Email
-                d.fullName,             // 2. Delegate Name
-                d.email,                // 3. Delegate Email
-                d.phoneNumber,          // 4. Delegate Phone
-                d.nationalId,
-                d.birthDate,
-                d.gender,
-                d.grade,
-                d.city,
-                d.accomodation,
-                d.englishLevel,
-                d.committeePreferences?.[0] || '',
-                d.committeePreferences?.[1] || '',
-                d.committeePreferences?.[2] || '',
-                d.experience,
-                d.motivationLetter,
-                d.dietaryPreferences,
-                d.additionalInfo
+                formData.school,        // 0
+                email,                  // 1 (Advisor Email)
+                d.fullName,             // 2
+                d.email,                // 3
+                d.phoneNumber,          // 4
+                d.nationalId,           // 5
+                d.birthDate,            // 6
+                d.gender,               // 7
+                d.grade,                // 8
+                d.city,                 // 9
+                d.accomodation,         // 10
+                d.englishLevel,         // 11
+                d.committeePreferences?.[0] || '', // 12
+                d.committeePreferences?.[1] || '', // 13
+                d.committeePreferences?.[2] || '', // 14
+                d.experience,           // 15
+                d.motivationLetter,     // 16
+                d.dietaryPreferences,   // 17
+                d.additionalInfo        // 18
             ]);
         }
     } else {
-        // Individual Forms (Delegate, Press, Admin, PR)
-        // Common structure: 
-        // Name, Email, Phone, ID, DOB, Gender, School, City, Grade, Acc, [Specifics], Diet, Info
-        
         const base = [
             formData.fullName,
             email,
@@ -111,7 +104,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ typ
                  formData.camera
              ];
         } else {
-            // Admin / PR
              specifics = [
                  formData.experience,
                  formData.motivationLetter
@@ -148,6 +140,4 @@ export async function POST(request: Request, { params }: { params: Promise<{ typ
       { status: 500 }
     );
   }
-} 
-
-*/
+}
