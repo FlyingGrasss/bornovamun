@@ -12,7 +12,7 @@ export default function Home() {
             BORNOVAMUN&apos;26
           </h1>
           <p className="text-white text-2xl max-sm:text-lg mb-2">
-            16-17-18 Ocak 2026
+            16-17-18 January 2026
           </p>
         </div>
 
