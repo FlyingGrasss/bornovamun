@@ -12,7 +12,6 @@ export const metadata: Metadata = {
 const applications = [
   { id: 'delegate', title: 'Delegate', img: '/applications/delegate.webp', desc: 'Represent a nation and debate global issues.' },
   { id: 'press', title: 'Press', img: '/applications/press.webp', desc: 'Capture the moments and report the news.' },
-  { id: 'pr', title: 'Public Relations', img: '/applications/pr.webp', desc: 'Manage communications and media presence.' },
   { id: 'admin', title: 'Admin', img: '/applications/admin.webp', desc: 'Ensure the smooth operation of the conference.' },
   { id: 'delegation', title: 'Delegation', img: '/applications/delegation.webp', desc: 'Apply as a school or group delegation.' },
 ];
