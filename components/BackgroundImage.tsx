@@ -50,7 +50,7 @@ export default function BackgroundImage() {
   return (
     <div 
       className="fixed top-0 left-0 w-full z-[-1] overflow-hidden"
-      style={{ height: 'calc(var(--vh, 1vh) * 100)' }}
+      style={{ height: '900px' }}
     >
       <Image
         src={"/trees.jpg"}
