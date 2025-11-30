@@ -8,6 +8,7 @@ import Navbar from "@/components/Navbar"
 import Footer from "@/components/Footer"
 import Image from "next/image"
 import BackgroundAnimations from "@/components/BackgroundAnimations"
+import BackgroundImage from "@/components/BackgroundImage"
 
 // Initialize Montserrat font
 const montserrat = Montserrat({
@@ -112,18 +113,7 @@ export default function RootLayout({
         className={`overflow-x-hidden max-w-screen ${montserrat.variable} ${montserrat.className} antialiased`}
         style={{ scrollbarWidth: "none" }}
       >
-        <div className="fixed inset-0 z-[-2]">
-            <Image
-                src="/trees.jpg" 
-                alt="Background" 
-                fill 
-                className="object-cover opacity-90" // Adjust opacity to blend with dark theme
-                priority
-                quality={85}
-            />
-            {/* Dark overlay to ensure text readability over the image */}
-            <div className="absolute inset-0 bg-[#0A1938]/90" />
-        </div>
+        <BackgroundImage />
 
         {/* Global Particles */}
         <BackgroundAnimations />

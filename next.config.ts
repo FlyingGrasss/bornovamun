@@ -7,7 +7,7 @@ const nextConfig: NextConfig = {
       hostname: 'cdn.sanity.io',
       pathname: '/images/**'
     }],
-    qualities: [70, 85]
+    qualities: [70, 85, 90]
   },
 };
 

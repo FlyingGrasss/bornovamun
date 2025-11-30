@@ -35,28 +35,28 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 const portableTextComponents = {
   block: {
     h1: ({ children }: any) => (
-      <h1 className="text-5xl font-bold mt-12 mb-6 text-[hsl(42,72%,52%)] leading-tight">{children}</h1>
+      <h1 className="text-5xl max-sm:text-3xl font-bold mt-12 mb-6 text-[hsl(42,72%,52%)] leading-tight">{children}</h1>
     ),
     h2: ({ children }: any) => (
-      <h2 className="text-4xl font-bold mt-12 mb-6 text-white leading-tight">{children}</h2>
+      <h2 className="text-4xl max-sm:text-2xl font-bold mt-12 mb-6 text-white leading-tight">{children}</h2>
     ),
     h3: ({ children }: any) => (
-      <h3 className="text-3xl font-bold mt-10 mb-5 text-white leading-tight">{children}</h3>
+      <h3 className="text-3xl max-sm:text-xl font-bold mt-10 mb-5 text-white leading-tight">{children}</h3>
     ),
     h4: ({ children }: any) => (
-      <h4 className="text-2xl font-bold mt-8 mb-4 text-white leading-tight">{children}</h4>
+      <h4 className="text-2xl max-sm:text-lg font-bold mt-8 mb-4 text-white leading-tight">{children}</h4>
     ),
     h5: ({ children }: any) => (
-      <h5 className="text-xl font-bold mt-6 mb-3 text-white leading-tight">{children}</h5>
+      <h5 className="text-xl max-sm:text-base font-bold mt-6 mb-3 text-white leading-tight">{children}</h5>
     ),
     h6: ({ children }: any) => (
-      <h6 className="text-lg font-bold mt-4 mb-2 text-white leading-tight">{children}</h6>
+      <h6 className="text-lg max-sm:text-sm font-bold mt-4 mb-2 text-white leading-tight">{children}</h6>
     ),
     normal: ({ children }: any) => (
-      <p className="mb-6 text-lg max-sm:text-sm leading-8 text-gray-300">{children}</p>
+      <p className="mb-6 text-lg  max-sm:text-sm leading-8 text-gray-300">{children}</p>
     ),
     blockquote: ({ children }: any) => (
-      <blockquote className="border-l-4 border-[hsl(42,72%,52%)] pl-8 py-4 my-8 italic text-xl text-gray-400 bg-black/20">{children}</blockquote>
+      <blockquote className="border-l-4 border-[hsl(42,72%,52%)] pl-8 py-4 my-8 italic text-xl max-sm:text-base text-gray-400 bg-black/20">{children}</blockquote>
     ),
   },
   marks: {
@@ -107,8 +107,8 @@ const SecretariatPage = async ({ params }: { params: Promise<{ slug: string }> }
          </div>
 
          <div className="w-full md:w-2/3">
-            <h1 className="text-6xl font-bold text-white mb-2">{member.name}</h1>
-            <h2 className="text-3xl text-[hsl(42,72%,52%)] mb-8 font-semibold">{member.role}</h2>
+            <h1 className="text-6xl max-sm:text-3xl font-bold text-white mb-2">{member.name}</h1>
+            <h2 className="text-3xl max-sm:text-xl text-[hsl(42,72%,52%)] mb-8 font-semibold">{member.role}</h2>
             
             <div className="prose max-w-none">
                 <PortableText 
