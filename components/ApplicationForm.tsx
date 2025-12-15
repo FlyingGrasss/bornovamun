@@ -17,20 +17,33 @@ interface FormData {
   gender: string;
   grade: string;
   city: string;
-  accomodation: string;
   dietaryPreferences: string;
   additionalInfo: string;
-  
+
   // Specific
   motivationLetter: string;
   experience: string;
   englishLevel: string; // Delegate
   committeePreferences: string[]; // Delegate
   camera: string; // Press
-  
+
   // Delegation Specific (Main Contact)
   numberOfDelegates: number;
+
+  // Chair Specific
+  chairAnswer1?: string;
+  chairAnswer2?: string;
 }
+
+const COMMITTEES = [
+  'H-JCC',
+  'F-European Parliament',
+  'British Commonwealth Of 1949',
+  'INTERPOL',
+  'UNPEACE',
+  'DISEC',
+  'WHO'
+];
 
 const initialFormState: FormData = {
   fullName: '',
@@ -42,7 +55,6 @@ const initialFormState: FormData = {
   school: '',
   grade: '',
   city: '',
-  accomodation: '',
   motivationLetter: '',
   experience: '',
   committeePreferences: ['', '', ''],
@@ -50,7 +62,9 @@ const initialFormState: FormData = {
   englishLevel: '',
   dietaryPreferences: '',
   camera: '',
-  numberOfDelegates: 8
+  numberOfDelegates: 8,
+  chairAnswer1: '',
+  chairAnswer2: ''
 };
 
 interface DelegateMember {
@@ -62,7 +76,6 @@ interface DelegateMember {
   gender: string;
   grade: string;
   city: string;
-  accomodation: string;
   motivationLetter: string;
   experience: string;
   committeePreferences: string[];
@@ -78,7 +91,7 @@ const ApplicationForm = ({ applicationType }: { applicationType: string }) => {
   const [verificationModalOpen, setVerificationModalOpen] = useState(false);
   const [verificationCode, setVerificationCode] = useState('');
   // Use a separate message state for the modal to avoid conflicts
-  const [mainPageMessage, setMainPageMessage] = useState({ text: '', isError: false }); 
+  const [mainPageMessage, setMainPageMessage] = useState({ text: '', isError: false });
   const [modalMessage, setModalMessage] = useState({ text: '', isError: false });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -95,23 +108,23 @@ const ApplicationForm = ({ applicationType }: { applicationType: string }) => {
   useEffect(() => {
     const savedData = localStorage.getItem(`bornova_form_${applicationType}`);
     const savedDelegates = localStorage.getItem(`bornova_form_delegates_${applicationType}`);
-    
+
     if (savedData) {
       try {
         const parsed = JSON.parse(savedData);
         setFormData(parsed);
         // If delegation forms were previously generated, restore that state
         if (parsed.numberOfDelegates >= 8 && applicationType === 'delegation') {
-            setFormsGenerated(true);
+          setFormsGenerated(true);
         }
       } catch (e) { console.error("Failed to load saved form", e); }
     }
 
     if (savedDelegates && applicationType === 'delegation') {
-        try {
-            setDelegates(JSON.parse(savedDelegates));
-            setFormsGenerated(true);
-        } catch (e) { console.error("Failed to load saved delegates", e); }
+      try {
+        setDelegates(JSON.parse(savedDelegates));
+        setFormsGenerated(true);
+      } catch (e) { console.error("Failed to load saved delegates", e); }
     }
 
     setIsLoaded(true);
@@ -120,13 +133,13 @@ const ApplicationForm = ({ applicationType }: { applicationType: string }) => {
   // 2. Save to Local Storage on Change (Debounced)
   useEffect(() => {
     if (isLoaded) {
-        const timeout = setTimeout(() => {
-            localStorage.setItem(`bornova_form_${applicationType}`, JSON.stringify(formData));
-            if (applicationType === 'delegation' && delegates.length > 0) {
-                localStorage.setItem(`bornova_form_delegates_${applicationType}`, JSON.stringify(delegates));
-            }
-        }, 500); // 500ms debounce
-        return () => clearTimeout(timeout);
+      const timeout = setTimeout(() => {
+        localStorage.setItem(`bornova_form_${applicationType}`, JSON.stringify(formData));
+        if (applicationType === 'delegation' && delegates.length > 0) {
+          localStorage.setItem(`bornova_form_delegates_${applicationType}`, JSON.stringify(delegates));
+        }
+      }, 500); // 500ms debounce
+      return () => clearTimeout(timeout);
     }
   }, [formData, delegates, applicationType, isLoaded]);
 
@@ -152,19 +165,19 @@ const ApplicationForm = ({ applicationType }: { applicationType: string }) => {
       setMainPageMessage({ text: 'Minimum number of delegates is 8', isError: true });
       return;
     }
-    
+
     // If we already have delegates in state (from localstorage), preserve them if count matches
     if (delegates.length === formData.numberOfDelegates && formsGenerated) {
-        setFormsGenerated(true);
-        setMainPageMessage({ text: '', isError: false });
-        return;
+      setFormsGenerated(true);
+      setMainPageMessage({ text: '', isError: false });
+      return;
     }
 
     const newDelegates = Array(formData.numberOfDelegates).fill({
-       fullName: '', birthDate: '', phoneNumber: '', email: '', nationalId: '',
-       gender: '', grade: '', city: '', accomodation: '', motivationLetter: '',
-       experience: '', committeePreferences: ['', '', ''], additionalInfo: '',
-       englishLevel: '', dietaryPreferences: ''
+      fullName: '', birthDate: '', phoneNumber: '', email: '', nationalId: '',
+      gender: '', grade: '', city: '', motivationLetter: '',
+      experience: '', committeePreferences: ['', '', ''], additionalInfo: '',
+      englishLevel: '', dietaryPreferences: ''
     });
 
     setDelegates(newDelegates);
@@ -190,10 +203,31 @@ const ApplicationForm = ({ applicationType }: { applicationType: string }) => {
     e.preventDefault();
     setIsSubmitting(true);
     setMainPageMessage({ text: '', isError: false }); // Clear main page message
-    setModalMessage({text: '', isError: false}); // Clear modal message
+    setModalMessage({ text: '', isError: false }); // Clear modal message
+
+    // Explicit Chair Validation for Word Count
+    // Word Count Validation
+    if (applicationType !== 'delegation') {
+      if (getWordCount(formData.motivationLetter) < 150) {
+        setMainPageMessage({ text: 'Motivation letter must be at least 150 words.', isError: true });
+        setIsSubmitting(false);
+        window.scrollTo(0, 0);
+        return;
+      }
+    } else {
+      // Validate all delegates
+      for (let i = 0; i < delegates.length; i++) {
+        if (getWordCount(delegates[i].motivationLetter) < 150) {
+          setMainPageMessage({ text: `Delegate #${i + 1}'s motivation letter must be at least 150 words.`, isError: true });
+          setIsSubmitting(false);
+          window.scrollTo(0, 0);
+          return;
+        }
+      }
+    }
 
     const name = applicationType === 'delegation' ? formData.school : formData.fullName;
-    
+
     const body = {
       email: formData.email,
       name: name,
@@ -223,8 +257,8 @@ const ApplicationForm = ({ applicationType }: { applicationType: string }) => {
     } catch (error) {
       // If error already handled for main page, do nothing here.
       // Otherwise, set a generic error on main page.
-      if (!mainPageMessage.text) { 
-          setMainPageMessage({ text: error instanceof Error ? error.message : 'An unexpected error occurred', isError: true });
+      if (!mainPageMessage.text) {
+        setMainPageMessage({ text: error instanceof Error ? error.message : 'An unexpected error occurred', isError: true });
       }
     } finally {
       setIsSubmitting(false);
@@ -235,18 +269,18 @@ const ApplicationForm = ({ applicationType }: { applicationType: string }) => {
     e.preventDefault();
     setIsSubmitting(true);
     setModalMessage({ text: '', isError: false }); // Clear previous modal message
-    
+
     let verificationBody: any = { code: verificationCode, lang: 'en', ...formData };
-    
-    if(applicationType === 'delegation') {
-        verificationBody = {
-            school: formData.school,
-            email: formData.email, 
-            numberOfDelegates: formData.numberOfDelegates,
-            delegates: delegates, 
-            code: verificationCode,
-            lang: 'en'
-        };
+
+    if (applicationType === 'delegation') {
+      verificationBody = {
+        school: formData.school,
+        email: formData.email,
+        numberOfDelegates: formData.numberOfDelegates,
+        delegates: delegates,
+        code: verificationCode,
+        lang: 'en'
+      };
     }
 
     try {
@@ -260,11 +294,11 @@ const ApplicationForm = ({ applicationType }: { applicationType: string }) => {
         setModalMessage({ text: result.message || 'Verification failed. Please check your code.', isError: true });
         throw new Error(result.message || 'Failed');
       }
-      
+
       // Clear local storage on success
       localStorage.removeItem(`bornova_form_${applicationType}`);
       localStorage.removeItem(`bornova_form_delegates_${applicationType}`);
-      
+
       window.location.href = '/success';
     } catch (error) {
       // Message already set in modalMessage state for display
@@ -274,127 +308,167 @@ const ApplicationForm = ({ applicationType }: { applicationType: string }) => {
   };
 
   // --- Render Parts ---
-  
+
   const titleMap: Record<string, string> = {
     delegate: "Delegate Application",
     press: "Press Application",
-    pr: "Public Relations Application",
+    chair: "Chair Application",
     admin: "Admin Application",
     delegation: "Delegation Application"
   };
 
   const commonFields = (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-           <label className="block text-white text-sm font-medium mb-2">
-             {applicationType === 'delegation' ? 'School Name *' : 'Full Name *'}
-           </label>
-           <input type="text" name={applicationType === 'delegation' ? 'school' : 'fullName'} value={applicationType === 'delegation' ? formData.school : formData.fullName} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required />
-        </div>
-        
-        {applicationType !== 'delegation' && (
-            <>
-                <div><label className="block text-white text-sm font-medium mb-2">Birth Date *</label><input type="date" name="birthDate" value={formData.birthDate} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required /></div>
-                <div><label className="block text-white text-sm font-medium mb-2">Phone Number *</label><input type="tel" name="phoneNumber" value={formData.phoneNumber} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required /></div>
-            </>
-        )}
+      <div>
+        <label className="block text-white text-sm font-medium mb-2">
+          {applicationType === 'delegation' ? 'School Name *' : 'Full Name *'}
+        </label>
+        <input type="text" name={applicationType === 'delegation' ? 'school' : 'fullName'} value={applicationType === 'delegation' ? formData.school : formData.fullName} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required />
+      </div>
 
-        <div><label className="block text-white text-sm font-medium mb-2">{applicationType === 'delegation' ? 'Contact Email *' : 'Email Address *'}</label><input type="email" name="email" value={formData.email} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required /></div>
+      {applicationType !== 'delegation' && (
+        <>
+          <div><label className="block text-white text-sm font-medium mb-2">Birth Date *</label><input type="date" name="birthDate" value={formData.birthDate} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required /></div>
+          <div><label className="block text-white text-sm font-medium mb-2">Phone Number *</label><input type="tel" name="phoneNumber" value={formData.phoneNumber} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required /></div>
+        </>
+      )}
 
-        {applicationType !== 'delegation' && (
-            <>
-                <div><label className="block text-white text-sm font-medium mb-2">National ID *</label><input type="text" name="nationalId" value={formData.nationalId} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required /></div>
-                <div>
-                    <label className="block text-white text-sm font-medium mb-2">Gender *</label>
-                    <select name="gender" value={formData.gender} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required>
-                        <option value="">Select gender</option>
-                        <option value="Male">Male</option>
-                        <option value="Female">Female</option>
-                        <option value="Other">Other</option>
-                    </select>
-                </div>
-                <div><label className="block text-white text-sm font-medium mb-2">School Name *</label><input type="text" name="school" value={formData.school} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required /></div>
-                <div>
-                    <label className="block text-white text-sm font-medium mb-2">Grade/Level *</label>
-                    <select name="grade" value={formData.grade} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required>
-                         <option value="">Select grade</option>
-                         <option value="Preparation Grade">Preparation</option>
-                         <option value="9th Grade">9th Grade</option>
-                         <option value="10th Grade">10th Grade</option>
-                         <option value="11th Grade">11th Grade</option>
-                         <option value="12th Grade">12th Grade</option>
-                         <option value="Graduate">Graduate</option>
-                    </select>
-                </div>
-                <div><label className="block text-white text-sm font-medium mb-2">City *</label><input type="text" name="city" value={formData.city} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required /></div>
-            </>
-        )}
+      <div><label className="block text-white text-sm font-medium mb-2">{applicationType === 'delegation' ? 'Contact Email *' : 'Email Address *'}</label><input type="email" name="email" value={formData.email} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required /></div>
+
+      {applicationType !== 'delegation' && (
+        <>
+          <div><label className="block text-white text-sm font-medium mb-2">National ID *</label><input type="text" name="nationalId" value={formData.nationalId} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required /></div>
+          <div>
+            <label className="block text-white text-sm font-medium mb-2">Gender *</label>
+            <select name="gender" value={formData.gender} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required>
+              <option value="">Select gender</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div><label className="block text-white text-sm font-medium mb-2">School Name *</label><input type="text" name="school" value={formData.school} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required /></div>
+          <div>
+            <label className="block text-white text-sm font-medium mb-2">Grade/Level *</label>
+            <select name="grade" value={formData.grade} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required>
+              <option value="">Select grade</option>
+              <option value="Preparation Grade">Preparation</option>
+              <option value="9th Grade">9th Grade</option>
+              <option value="10th Grade">10th Grade</option>
+              <option value="11th Grade">11th Grade</option>
+              <option value="12th Grade">12th Grade</option>
+              <option value="Graduate">Graduate</option>
+            </select>
+          </div>
+          <div><label className="block text-white text-sm font-medium mb-2">City *</label><input type="text" name="city" value={formData.city} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required /></div>
+        </>
+      )}
     </div>
   );
 
+  const getWordCount = (text: string) => {
+    if (!text) return 0;
+    return text.trim().split(/\s+/).filter(word => word.length > 0).length;
+  };
+
   const detailFields = (
-     <div className="space-y-6">
-        <div><label className="block text-white text-sm font-medium mb-2">Motivation Letter *</label><textarea name="motivationLetter" value={formData.motivationLetter} onChange={handleInputChange} rows={5} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white resize-none focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required /></div>
-        <div><label className="block text-white text-sm font-medium mb-2">Experience</label><textarea name="experience" value={formData.experience} onChange={handleInputChange} rows={4} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white resize-none focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" /></div>
+    <div className="space-y-6">
+      <div>
+        <label className="block text-white text-sm font-medium mb-2">
+          Motivation Letter * (Min 150 Words)
+        </label>
+        <textarea
+          name="motivationLetter"
+          value={formData.motivationLetter}
+          onChange={handleInputChange}
+          rows={5}
+          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white resize-none focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all"
+          required
+        />
+        <p className={`text-sm mt-1 text-left ${getWordCount(formData.motivationLetter) >= 150 ? 'text-green-500' : 'text-red-500'}`}>
+          {getWordCount(formData.motivationLetter)} / 150 words
+        </p>
+      </div>
 
-        {applicationType === 'delegate' && (
-            <>
-                <div>
-                    <label className="block text-white text-sm font-medium mb-2">Committee Preferences (Top 3) *</label>
-                    <div className="space-y-3">
-                         {[0,1,2].map(idx => (
-                             <select key={idx} value={formData.committeePreferences[idx]} onChange={(e) => handleCommitteeChange(idx, e.target.value)} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required={idx === 0}>
-                                 <option value="">{idx + 1}. Choice</option>
-                                 <option value="UNICEF">UNICEF</option>
-                                 <option value="UNODC">UNODC</option>
-                                 <option value="TDT">TDT</option>
-                                 <option value="CERN">CERN</option>
-                                 <option value="H-UNSC">H-UNSC</option>
-                             </select>
-                         ))}
-                    </div>
-                </div>
-                <div>
-                    <label className="block text-white text-sm font-medium mb-2">English Level *</label>
-                    <select name="englishLevel" value={formData.englishLevel} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required>
-                         <option value="">Select Level</option>
-                         <option value="Beginner">Beginner</option>
-                         <option value="Intermediate">Intermediate</option>
-                         <option value="Advanced">Advanced</option>
-                         <option value="Native">Native</option>
-                    </select>
-                </div>
-            </>
-        )}
+      <div><label className="block text-white text-sm font-medium mb-2">Experience</label><textarea name="experience" value={formData.experience} onChange={handleInputChange} rows={4} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white resize-none focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" /></div>
 
-        {applicationType === 'press' && (
-             <div><label className="block text-white text-sm font-medium mb-2">Camera Model</label><input name="camera" value={formData.camera} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" /></div>
-        )}
+      {(applicationType === 'delegate' || applicationType === 'chair') && (
+        <>
+          <div>
+            <label className="block text-white text-sm font-medium mb-2">Committee Preferences (Top 3) *</label>
+            <div className="space-y-3">
+              {[0, 1, 2].map(idx => (
+                <select key={idx} value={formData.committeePreferences[idx]} onChange={(e) => handleCommitteeChange(idx, e.target.value)} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required={idx === 0}>
+                  <option value="">{idx + 1}. Choice</option>
+                  {COMMITTEES.map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              ))}
+            </div>
+          </div>
 
-        <div>
-            <label className="block text-white text-sm font-medium mb-2">Accommodation Needed? *</label>
-            <select name="accomodation" value={formData.accomodation} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required>
-                 <option value="">Select</option>
-                 <option value="Yes">Yes</option>
-                 <option value="No">No</option>
-            </select>
-        </div>
+          {applicationType === 'chair' ? (
+            <div className="space-y-6">
+              <div>
+                <label className="block text-white text-sm font-medium mb-2">
+                  Case: Imagine that you are in the last session, and there are 2 different resolution paper, and non of them is finished nor qualified enough to be voted upon. There is literally no time to merge them, nor finish them. What would you do in this situation to stop committee from failing? (GA Only)
+                </label>
+                <textarea
+                  name="chairAnswer1"
+                  value={formData.chairAnswer1}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white resize-none focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all"
+                  rows={4}
+                />
+              </div>
+              <div>
+                <label className="block text-white text-sm font-medium mb-2">
+                  Please explain how a regular committee proceed while including the essential motions
+                </label>
+                <textarea
+                  name="chairAnswer2"
+                  value={formData.chairAnswer2}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white resize-none focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all"
+                  rows={4}
+                />
+              </div>
+            </div>
+          ) : (
+            <div>
+              <label className="block text-white text-sm font-medium mb-2">English Level *</label>
+              <select name="englishLevel" value={formData.englishLevel} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required>
+                <option value="">Select Level</option>
+                <option value="Beginner">Beginner</option>
+                <option value="Intermediate">Intermediate</option>
+                <option value="Advanced">Advanced</option>
+                <option value="Native">Native</option>
+              </select>
+            </div>
+          )}
+        </>
+      )}
 
-        <div>
-             <label className="block text-white text-sm font-medium mb-2">Dietary Preferences</label>
-             <select name="dietaryPreferences" value={formData.dietaryPreferences} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all">
-                 <option value="">None</option>
-                 <option value="Vegetarian">Vegetarian</option>
-                 <option value="Vegan">Vegan</option>
-                 <option value="Halal">Halal</option>
-                 <option value="Kosher">Kosher</option>
-                 <option value="Gluten-free">Gluten-free</option>
-                 <option value="Dairy-free">Dairy-free</option>
-             </select>
-        </div>
+      {applicationType === 'press' && (
+        <div><label className="block text-white text-sm font-medium mb-2">Camera Model</label><input name="camera" value={formData.camera} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" /></div>
+      )}
 
-        <div><label className="block text-white text-sm font-medium mb-2">Additional Info</label><textarea name="additionalInfo" value={formData.additionalInfo} onChange={handleInputChange} rows={3} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white resize-none focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" /></div>
-     </div>
+      <div>
+        <label className="block text-white text-sm font-medium mb-2">Dietary Preferences</label>
+        <select name="dietaryPreferences" value={formData.dietaryPreferences} onChange={handleInputChange} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all">
+          <option value="">None</option>
+          <option value="Vegetarian">Vegetarian</option>
+          <option value="Vegan">Vegan</option>
+          <option value="Halal">Halal</option>
+          <option value="Kosher">Kosher</option>
+          <option value="Gluten-free">Gluten-free</option>
+          <option value="Dairy-free">Dairy-free</option>
+        </select>
+      </div>
+
+      <div><label className="block text-white text-sm font-medium mb-2">Additional Info</label><textarea name="additionalInfo" value={formData.additionalInfo} onChange={handleInputChange} rows={3} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white resize-none focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" /></div>
+    </div>
   );
 
   return (
@@ -414,70 +488,79 @@ const ApplicationForm = ({ applicationType }: { applicationType: string }) => {
             {commonFields}
 
             {applicationType === 'delegation' && (
-                <div className="mt-6">
-                    <label className="block text-white text-sm font-medium mb-2">Number of Delegates * (Min 8)</label>
-                    <input type="number" name="numberOfDelegates" value={formData.numberOfDelegates} onChange={handleInputChange} min="8" className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required />
-                    <button type="button" onClick={handleGenerateForms} className="mt-4 px-6 py-3 bg-[hsl(42,72%,52%)] text-[#0A1938] font-bold rounded-lg hover:bg-white transition-colors cursor-pointer">
-                        Generate Forms
-                    </button>
-                </div>
+              <div className="mt-6">
+                <label className="block text-white text-sm font-medium mb-2">Number of Delegates * (Min 8)</label>
+                <input type="number" name="numberOfDelegates" value={formData.numberOfDelegates} onChange={handleInputChange} min="8" className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required />
+                <button type="button" onClick={handleGenerateForms} className="mt-4 px-6 py-3 bg-[hsl(42,72%,52%)] text-[#0A1938] font-bold rounded-lg hover:bg-white transition-colors cursor-pointer">
+                  Generate Forms
+                </button>
+              </div>
             )}
           </div>
 
           {applicationType !== 'delegation' && (
-              <div className="bg-gray-800 rounded-xl p-8 shadow-2xl">
-                <h2 className="text-2xl font-semibold mb-6 text-[hsl(42,72%,52%)]">Application Details</h2>
-                {detailFields}
-              </div>
+            <div className="bg-gray-800 rounded-xl p-8 shadow-2xl">
+              <h2 className="text-2xl font-semibold mb-6 text-[hsl(42,72%,52%)]">Application Details</h2>
+              {detailFields}
+            </div>
           )}
 
           {/* Delegation Loop */}
           {applicationType === 'delegation' && formsGenerated && (
-              <div className="space-y-8">
-                  {delegates.map((d, i) => (
-                      <div key={i} className="bg-gray-800 rounded-xl p-8 shadow-xl border-l-4 border-[hsl(42,72%,52%)]">
-                           <h3 className="text-xl font-bold text-white mb-6">Delegate #{i + 1}</h3>
-                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <input placeholder="Full Name *" value={d.fullName} onChange={e => handleDelegateMemberChange(i, 'fullName', e.target.value)} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required />
-                                <input placeholder="Email *" type="email" value={d.email} onChange={e => handleDelegateMemberChange(i, 'email', e.target.value)} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required />
-                                <input placeholder="Phone *" type="tel" value={d.phoneNumber} onChange={e => handleDelegateMemberChange(i, 'phoneNumber', e.target.value)} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required />
-                                <input placeholder="National ID *" value={d.nationalId} onChange={e => handleDelegateMemberChange(i, 'nationalId', e.target.value)} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required />
-                                <input placeholder="Birth Date *" type="date" value={d.birthDate} onChange={e => handleDelegateMemberChange(i, 'birthDate', e.target.value)} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required />
-                                
-                                <select value={d.gender} onChange={e => handleDelegateMemberChange(i, 'gender', e.target.value)} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required>
-                                    <option value="">Select Gender *</option><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option>
-                                </select>
-                                <select value={d.grade} onChange={e => handleDelegateMemberChange(i, 'grade', e.target.value)} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required>
-                                    <option value="">Select Grade *</option><option value="Preparation Grade">Preparation</option><option value="9th Grade">9th Grade</option><option value="10th Grade">10th Grade</option><option value="11th Grade">11th Grade</option><option value="12th Grade">12th Grade</option><option value="Graduate">Graduate</option>
-                                </select>
-                                <input placeholder="City *" value={d.city} onChange={e => handleDelegateMemberChange(i, 'city', e.target.value)} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required />
-                                
-                                <select value={d.accomodation} onChange={e => handleDelegateMemberChange(i, 'accomodation', e.target.value)} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required>
-                                    <option value="">Accommodation? *</option><option value="Yes">Yes</option><option value="No">No</option>
-                                </select>
+            <div className="space-y-8">
+              {delegates.map((d, i) => (
+                <div key={i} className="bg-gray-800 rounded-xl p-8 shadow-xl border-l-4 border-[hsl(42,72%,52%)]">
+                  <h3 className="text-xl font-bold text-white mb-6">Delegate #{i + 1}</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <input placeholder="Full Name *" value={d.fullName} onChange={e => handleDelegateMemberChange(i, 'fullName', e.target.value)} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required />
+                    <input placeholder="Email *" type="email" value={d.email} onChange={e => handleDelegateMemberChange(i, 'email', e.target.value)} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required />
+                    <input placeholder="Phone *" type="tel" value={d.phoneNumber} onChange={e => handleDelegateMemberChange(i, 'phoneNumber', e.target.value)} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required />
+                    <input placeholder="National ID *" value={d.nationalId} onChange={e => handleDelegateMemberChange(i, 'nationalId', e.target.value)} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required />
+                    <input placeholder="Birth Date *" type="date" value={d.birthDate} onChange={e => handleDelegateMemberChange(i, 'birthDate', e.target.value)} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required />
 
-                                <div className="md:col-span-2 space-y-2">
-                                    <label className="text-white text-sm">Committee Preferences *</label>
-                                    {[0,1,2].map(idx => (
-                                        <select key={idx} value={d.committeePreferences[idx]} onChange={e => handleMemberCommitteeChange(i, idx, e.target.value)} className="w-full bg-gray-700 p-3 rounded text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required={idx === 0}>
-                                            <option value="">{idx + 1}. Choice</option><option value="UNICEF">UNICEF</option><option value="UNODC">UNODC</option><option value="TDT">TDT</option><option value="CERN">CERN</option><option value="H-UNSC">H-UNSC</option>
-                                        </select>
-                                    ))}
-                                </div>
-                                <select value={d.englishLevel} onChange={e => handleDelegateMemberChange(i, 'englishLevel', e.target.value)} className="bg-gray-700 p-3 rounded text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required>
-                                    <option value="">English Level *</option><option value="Beginner">Beginner</option><option value="Intermediate">Intermediate</option><option value="Advanced">Advanced</option><option value="Native">Native</option>
-                                </select>
-                                <select value={d.dietaryPreferences} onChange={e => handleDelegateMemberChange(i, 'dietaryPreferences', e.target.value)} className="bg-gray-700 p-3 rounded text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all">
-                                    <option value="">Dietary Prefs</option><option value="Vegetarian">Vegetarian</option><option value="Vegan">Vegan</option><option value="Halal">Halal</option><option value="Kosher">Kosher</option><option value="Gluten-free">Gluten-free</option><option value="Dairy-free">Dairy-free</option>
-                                </select>
+                    <select value={d.gender} onChange={e => handleDelegateMemberChange(i, 'gender', e.target.value)} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required>
+                      <option value="">Select Gender *</option><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option>
+                    </select>
+                    <select value={d.grade} onChange={e => handleDelegateMemberChange(i, 'grade', e.target.value)} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required>
+                      <option value="">Select Grade *</option><option value="Preparation Grade">Preparation</option><option value="9th Grade">9th Grade</option><option value="10th Grade">10th Grade</option><option value="11th Grade">11th Grade</option><option value="12th Grade">12th Grade</option><option value="Graduate">Graduate</option>
+                    </select>
+                    <input placeholder="City *" value={d.city} onChange={e => handleDelegateMemberChange(i, 'city', e.target.value)} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required />
 
-                                <textarea placeholder="Experience" value={d.experience} onChange={e => handleDelegateMemberChange(i, 'experience', e.target.value)} className="md:col-span-2 bg-gray-700 p-3 rounded text-white resize-none focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" rows={3} />
-                                <textarea placeholder="Motivation Letter *" value={d.motivationLetter} onChange={e => handleDelegateMemberChange(i, 'motivationLetter', e.target.value)} className="md:col-span-2 bg-gray-700 p-3 rounded text-white resize-none focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" rows={4} required />
-                                <textarea placeholder="Additional Info" value={d.additionalInfo} onChange={e => handleDelegateMemberChange(i, 'additionalInfo', e.target.value)} className="md:col-span-2 bg-gray-700 p-3 rounded text-white resize-none focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" rows={2} />
-                           </div>
-                      </div>
-                  ))}
-              </div>
+                    {/* Accommodation Removed */}
+
+                    <div className="md:col-span-2 space-y-2">
+                      <label className="text-white text-sm">Committee Preferences *</label>
+                      {[0, 1, 2].map(idx => (
+                        <select key={idx} value={d.committeePreferences[idx]} onChange={e => handleMemberCommitteeChange(i, idx, e.target.value)} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required={idx === 0}>
+                          <option value="">{idx + 1}. Choice</option>
+                          {COMMITTEES.map(c => (
+                            <option key={c} value={c}>{c}</option>
+                          ))}
+                        </select>
+                      ))}
+                    </div>
+                    <select value={d.englishLevel} onChange={e => handleDelegateMemberChange(i, 'englishLevel', e.target.value)} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" required>
+                      <option value="">English Level *</option><option value="Beginner">Beginner</option><option value="Intermediate">Intermediate</option><option value="Advanced">Advanced</option><option value="Native">Native</option>
+                    </select>
+                    <select value={d.dietaryPreferences} onChange={e => handleDelegateMemberChange(i, 'dietaryPreferences', e.target.value)} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all">
+                      <option value="">Dietary Prefs</option><option value="Vegetarian">Vegetarian</option><option value="Vegan">Vegan</option><option value="Halal">Halal</option><option value="Kosher">Kosher</option><option value="Gluten-free">Gluten-free</option><option value="Dairy-free">Dairy-free</option>
+                    </select>
+
+                    <div className="md:col-span-2">
+                      <textarea placeholder="Experience" value={d.experience} onChange={e => handleDelegateMemberChange(i, 'experience', e.target.value)} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white resize-none focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" rows={3} />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-white text-sm font-medium mb-1">Motivation Letter * (Min 150 Words)</label>
+                      <textarea placeholder="Motivation Letter *" value={d.motivationLetter} onChange={e => handleDelegateMemberChange(i, 'motivationLetter', e.target.value)} className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white resize-none focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" rows={4} required />
+                      <p className={`text-sm mt-1 text-left ${getWordCount(d.motivationLetter) >= 150 ? 'text-green-500' : 'text-red-500'}`}>
+                        {getWordCount(d.motivationLetter)} / 150 words
+                      </p>
+                    </div>
+                    <textarea placeholder="Additional Info" value={d.additionalInfo} onChange={e => handleDelegateMemberChange(i, 'additionalInfo', e.target.value)} className="md:col-span-2 w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white resize-none focus:outline-none focus:ring-2 focus:border-[hsl(42,72%,52%)] transition-all" rows={2} />
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
 
           {mainPageMessage.text && (
@@ -487,75 +570,75 @@ const ApplicationForm = ({ applicationType }: { applicationType: string }) => {
           )}
 
           {(applicationType !== 'delegation' || formsGenerated) && (
-              <div className="text-center">
+            <div className="text-center">
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className={`group glassmorphism text-xl max-sm:text-base cursor-pointer items-center transition-all duration-300 justify-center gap-4 max-sm:gap-2 inline-flex backdrop-blur-md rounded-full px-8 py-4 max-sm:px-6 max-sm:py-3 shadow-lg ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                {isSubmitting ? 'Submitting...' : 'Submit Application'}
+                <svg
+                  width="24"
+                  height="19"
+                  viewBox="0 0 24 19"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="transition-transform duration-300 group-hover:translate-x-2 max-sm:w-[15px]"
+                >
+                  <path
+                    fillRule="evenodd"
+                    clipRule="evenodd"
+                    d="M14.7105 0.439344C14.1953 1.02511 14.1953 1.97487 14.7105 2.56064L19.4951 7.99997H1.56946C0.840735 7.99997 0.25 8.67155 0.25 9.49997C0.25 10.3284 0.840735 11 1.56946 11H19.4951L14.7105 16.4392C14.1953 17.0251 14.1953 17.9749 14.7105 18.5606C15.2258 19.1465 16.0614 19.1465 16.5765 18.5606L23.6136 10.5606C24.1288 9.97473 24.1288 9.02509 23.6136 8.43932L16.5765 0.439344C16.0614 -0.146448 15.2258 -0.146448 14.7105 0.439344Z"
+                    className="fill-white group-hover:fill-[hsl(42,72%,52%)] transition-colors duration-300"
+                  />
+                </svg>
+              </button>
+            </div>
+          )}
+        </form>
+
+
+        {mounted && verificationModalOpen && createPortal(
+          <div className="fixed inset-0 z-9999 flex items-center justify-center bg-[#0B1A39] h-screen w-screen touch-none overscroll-none">
+            <div className="bg-[#0A1938] border-2 border-[hsl(42,72%,52%)] p-8 rounded-3xl max-w-md w-[90%] shadow-2xl flex flex-col gap-4 animate-in fade-in zoom-in duration-300">
+              <h2 className="text-3xl font-bold text-[hsl(42,72%,52%)] text-center">Verify Email</h2>
+              <p className="text-gray-300 text-center">
+                We've sent a verification code to <span className="text-white font-semibold">{formData.email}</span>.
+              </p>
+
+              {/* MODAL ERROR MESSAGE DISPLAY */}
+              {modalMessage.text && (
+                <div className={`mt-2 p-3 rounded-lg text-center ${modalMessage.isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                  {modalMessage.text}
+                </div>
+              )}
+
+              <form onSubmit={handleVerify} className="flex flex-col gap-4 mt-2">
+                <input
+                  type="text"
+                  value={verificationCode}
+                  onChange={(e) => setVerificationCode(e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl text-white text-center text-2xl tracking-widest focus:border-[hsl(42,72%,52%)] focus:outline-none transition-colors"
+                  placeholder="CODE"
+                  required
+                />
+
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className={`group glassmorphism text-xl max-sm:text-base cursor-pointer items-center transition-all duration-300 justify-center gap-4 max-sm:gap-2 inline-flex backdrop-blur-md rounded-full px-8 py-4 max-sm:px-6 max-sm:py-3 shadow-lg ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  className={`w-full px-4 py-4 cursor-pointer bg-[hsl(42,72%,52%)] text-[#0A1938] font-bold text-xl rounded-xl hover:bg-white transition-all active:scale-95 ${isSubmitting ? 'opacity-70' : ''}`}
                 >
-                  {isSubmitting ? 'Submitting...' : 'Submit Application'}
-                  <svg
-                    width="24"
-                    height="19"
-                    viewBox="0 0 24 19"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="transition-transform duration-300 group-hover:translate-x-2 max-sm:w-[15px]"
-                  >
-                    <path
-                        fillRule="evenodd"
-                        clipRule="evenodd"
-                        d="M14.7105 0.439344C14.1953 1.02511 14.1953 1.97487 14.7105 2.56064L19.4951 7.99997H1.56946C0.840735 7.99997 0.25 8.67155 0.25 9.49997C0.25 10.3284 0.840735 11 1.56946 11H19.4951L14.7105 16.4392C14.1953 17.0251 14.1953 17.9749 14.7105 18.5606C15.2258 19.1465 16.0614 19.1465 16.5765 18.5606L23.6136 10.5606C24.1288 9.97473 24.1288 9.02509 23.6136 8.43932L16.5765 0.439344C16.0614 -0.146448 15.2258 -0.146448 14.7105 0.439344Z"
-                        className="fill-white group-hover:fill-[hsl(42,72%,52%)] transition-colors duration-300"
-                    />
-                  </svg>
+                  {isSubmitting ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="animate-spin h-5 w-5 border-2 border-[#0A1938] border-t-transparent rounded-full"></span>
+                      Verifying...
+                    </span>
+                  ) : 'Verify Code'}
                 </button>
-              </div>
-          )}
-        </form>
-        
-
-        {mounted && verificationModalOpen && createPortal(
-           <div className="fixed inset-0 z-9999 flex items-center justify-center bg-[#0B1A39] h-screen w-screen touch-none overscroll-none">
-             <div className="bg-[#0A1938] border-2 border-[hsl(42,72%,52%)] p-8 rounded-3xl max-w-md w-[90%] shadow-2xl flex flex-col gap-4 animate-in fade-in zoom-in duration-300">
-               <h2 className="text-3xl font-bold text-[hsl(42,72%,52%)] text-center">Verify Email</h2>
-               <p className="text-gray-300 text-center">
-                 We've sent a verification code to <span className="text-white font-semibold">{formData.email}</span>.
-               </p>
-               
-               {/* MODAL ERROR MESSAGE DISPLAY */}
-               {modalMessage.text && (
-                 <div className={`mt-2 p-3 rounded-lg text-center ${modalMessage.isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-                   {modalMessage.text}
-                 </div>
-               )}
-
-               <form onSubmit={handleVerify} className="flex flex-col gap-4 mt-2">
-                 <input 
-                    type="text" 
-                    value={verificationCode} 
-                    onChange={(e) => setVerificationCode(e.target.value)} 
-                    className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl text-white text-center text-2xl tracking-widest focus:border-[hsl(42,72%,52%)] focus:outline-none transition-colors" 
-                    placeholder="CODE" 
-                    required 
-                 />
-                 
-                 <button 
-                    type="submit" 
-                    disabled={isSubmitting}
-                    className={`w-full px-4 py-4 cursor-pointer bg-[hsl(42,72%,52%)] text-[#0A1938] font-bold text-xl rounded-xl hover:bg-white transition-all active:scale-95 ${isSubmitting ? 'opacity-70' : ''}`}
-                 >
-                    {isSubmitting ? (
-                        <span className="flex items-center justify-center gap-2">
-                            <span className="animate-spin h-5 w-5 border-2 border-[#0A1938] border-t-transparent rounded-full"></span>
-                            Verifying...
-                        </span>
-                    ) : 'Verify Code'}
-                 </button>
-               </form>
-             </div>
-           </div>,
-           document.body
+              </form>
+            </div>
+          </div>,
+          document.body
         )}
       </div>
     </div>

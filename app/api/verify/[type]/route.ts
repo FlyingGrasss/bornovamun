@@ -11,14 +11,14 @@ const auth = new google.auth.GoogleAuth({
 });
 
 const getSheetId = (type: string) => {
-    switch(type) {
-        case 'delegate': return process.env.GOOGLE_SHEET_ID_DELEGATE;
-        case 'press': return process.env.GOOGLE_SHEET_ID_PRESS;
-        case 'pr': return process.env.GOOGLE_SHEET_ID_PR;
-        case 'admin': return process.env.GOOGLE_SHEET_ID_ADMIN;
-        case 'delegation': return process.env.GOOGLE_SHEET_ID_DELEGATION;
-        default: return null;
-    }
+  switch (type) {
+    case 'delegate': return process.env.GOOGLE_SHEET_ID_DELEGATE;
+    case 'press': return process.env.GOOGLE_SHEET_ID_PRESS;
+    case 'chair': return process.env.GOOGLE_SHEET_ID_CHAIR;
+    case 'admin': return process.env.GOOGLE_SHEET_ID_ADMIN;
+    case 'delegation': return process.env.GOOGLE_SHEET_ID_DELEGATION;
+    default: return null;
+  }
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ type: string }> }) {
@@ -49,79 +49,96 @@ export async function POST(request: Request, { params }: { params: Promise<{ typ
     let values: any[][] = [];
 
     if (type === 'delegation') {
-        if (Array.isArray(formData.delegates)) {
-            values = formData.delegates.map((d: any) => [
-                formData.school,        // 0
-                email,                  // 1 (Advisor Email)
-                d.fullName,             // 2
-                d.email,                // 3
-                d.phoneNumber,          // 4
-                d.nationalId,           // 5
-                d.birthDate,            // 6
-                d.gender,               // 7
-                d.grade,                // 8
-                d.city,                 // 9
-                d.accomodation,         // 10
-                d.englishLevel,         // 11
-                d.committeePreferences?.[0] || '', // 12
-                d.committeePreferences?.[1] || '', // 13
-                d.committeePreferences?.[2] || '', // 14
-                d.experience,           // 15
-                d.motivationLetter,     // 16
-                d.dietaryPreferences,   // 17
-                d.additionalInfo        // 18
-            ]);
-        }
+      if (Array.isArray(formData.delegates)) {
+        // 1. Add the Delegation Header Row
+        values.push([
+          formData.school,               // Column 1: School Name
+          formData.numberOfDelegates,    // Column 2: Delegate Count
+          email                          // Column 3: Advisor/delegation Email
+        ]);
+
+        // 2. Add each Delegate Row
+        formData.delegates.forEach((d: any) => {
+          values.push([
+            d.fullName,                  // 1: Delegate Full Name
+            d.birthDate,                 // 2: Birth Date
+            d.nationalId,                // 3: TC
+            d.gender,                    // 4: Gender
+            d.committeePreferences?.[0] || '', // 5: Committee 1
+            d.committeePreferences?.[1] || '', // 6: Committee 2
+            d.committeePreferences?.[2] || '', // 7: Committee 3
+            d.englishLevel,              // 8: English Level
+            d.dietaryPreferences,        // 9: Diet
+            d.email,                     // 10: Email
+            d.phoneNumber,               // 11: Phone Number
+            d.city,                      // 12: City
+            d.grade,                     // 13: Grade
+            d.experience,                // 14: Experience
+            d.motivationLetter,          // 15: Motivation Letter
+            d.additionalInfo             // 16: Additional Info
+          ]);
+        });
+      }
     } else {
-        const base = [
-            formData.fullName,
-            email,
-            formData.phoneNumber,
-            formData.nationalId,
-            formData.birthDate,
-            formData.gender,
-            formData.school,
-            formData.city,
-            formData.grade,
-            formData.accomodation,
+      const base = [
+        formData.fullName,
+        email,
+        formData.phoneNumber,
+        formData.nationalId,
+        formData.birthDate,
+        formData.gender,
+        formData.school,
+        formData.city,
+        formData.grade,
+      ];
+
+      let specifics: any[] = [];
+
+      if (type === 'delegate') {
+        specifics = [
+          formData.englishLevel,
+          formData.committeePreferences?.[0] || '',
+          formData.committeePreferences?.[1] || '',
+          formData.committeePreferences?.[2] || '',
+          formData.experience,
+          formData.motivationLetter
         ];
-
-        let specifics: any[] = [];
-        
-        if (type === 'delegate') {
-             specifics = [
-                 formData.englishLevel,
-                 formData.committeePreferences?.[0] || '',
-                 formData.committeePreferences?.[1] || '',
-                 formData.committeePreferences?.[2] || '',
-                 formData.experience,
-                 formData.motivationLetter
-             ];
-        } else if (type === 'press') {
-             specifics = [
-                 formData.experience,
-                 formData.motivationLetter,
-                 formData.camera
-             ];
-        } else {
-             specifics = [
-                 formData.experience,
-                 formData.motivationLetter
-             ];
-        }
-
-        const footer = [
-            formData.dietaryPreferences,
-            formData.additionalInfo
+      } else if (type === 'press') {
+        specifics = [
+          formData.experience,
+          formData.motivationLetter,
+          formData.camera
         ];
+      } else if (type === 'chair') {
+        specifics = [
+          formData.englishLevel || 'N/A',
+          formData.committeePreferences?.[0] || '',
+          formData.committeePreferences?.[1] || '',
+          formData.committeePreferences?.[2] || '',
+          formData.experience,
+          formData.motivationLetter,
+          formData.chairAnswer1 || '', // GA Question
+          formData.chairAnswer2 || ''  // Procedure Question
+        ];
+      } else {
+        specifics = [
+          formData.experience,
+          formData.motivationLetter
+        ];
+      }
 
-        values = [[...base, ...specifics, ...footer]];
+      const footer = [
+        formData.dietaryPreferences,
+        formData.additionalInfo
+      ];
+
+      values = [[...base, ...specifics, ...footer]];
     }
 
     const sheets = google.sheets({ version: 'v4', auth });
     await sheets.spreadsheets.values.append({
       spreadsheetId: sheetId,
-      range: 'Sayfa1!A:Z', 
+      range: 'Sayfa1!A:Z',
       valueInputOption: 'RAW',
       requestBody: { values }
     });

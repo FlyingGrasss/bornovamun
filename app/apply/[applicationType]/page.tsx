@@ -8,6 +8,7 @@ export async function generateStaticParams() {
   return [
     { applicationType: 'delegate' },
     { applicationType: 'press' },
+    { applicationType: 'chair' },
     { applicationType: 'admin' },
     { applicationType: 'delegation' },
   ];
@@ -24,7 +25,7 @@ export default async function Page({ params }: PageProps) {
   const { applicationType } = await params;
 
   // Double check valid types
-  const validTypes = ['delegate', 'press', 'admin', 'delegation'];
+  const validTypes = ['delegate', 'press', 'chair', 'admin', 'delegation'];
   if (!validTypes.includes(applicationType)) {
     notFound();
   }

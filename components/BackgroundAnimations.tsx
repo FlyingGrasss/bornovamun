@@ -19,7 +19,7 @@ const BackgroundAnimations = () => {
   useEffect(() => {
     if (!containerRef.current) return;
     const container = containerRef.current;
-    
+
     const particles: HTMLDivElement[] = [];
 
     // Initialize particles
@@ -28,7 +28,7 @@ const BackgroundAnimations = () => {
       particle.className = "particle";
       particle.style.pointerEvents = "none";
       // Crucial: Set initial opacity to 0 immediately via CSS or JS
-      particle.style.opacity = "0"; 
+      particle.style.opacity = "0";
       container.appendChild(particle);
       particles.push(particle);
     }
@@ -68,7 +68,7 @@ const BackgroundAnimations = () => {
         x: startX,
         y: startY,
         scale: isFirstRun ? Math.random() * 0.5 + 0.5 : 0,
-        opacity: 0, 
+        opacity: 0,
       });
 
       const endX = window.innerWidth * 0.5 + (Math.random() - 0.5) * 800;
@@ -104,7 +104,8 @@ const BackgroundAnimations = () => {
     // Stagger start
     particles.forEach((particle, i) => {
       // Use set timeout to space out their entry
-      setTimeout(() => animateParticle(particle, true), Math.random() * 3000);
+      // Use set timeout to space out their entry
+      setTimeout(() => animateParticle(particle, true), Math.random() * 100);
     });
 
     return () => {

@@ -24,7 +24,7 @@ export const metadata: Metadata = {
     template: "%s | BORNOVAMUN'26",
   },
   description:
-    "Join BORNOVAMUN'26 in Bornova on 16-17-18 January 2026 for a premier Model UN experience. Debate, diplomacy, and leadership await!",
+    "Join BORNOVAMUN'26 in Bornova on 24-25-26 January 2026 for a premier Model UN experience. Debate, diplomacy, and leadership await!",
   keywords: [
     "MUN",
     "Bornova Model United Nations",
@@ -58,7 +58,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "BORNOVAMUN'26 | Bornova Model United Nations",
     description:
-      "16-17-18 January 2026 | Experience diplomacy and debate at Bornova's premier MUN conference.",
+      "24-25-26 January 2026 | Experience diplomacy and debate at Bornova's premier MUN conference.",
     url: "https://www.bornovamun.org",
     siteName: "BORNOVAMUN'26",
     images: [
@@ -78,7 +78,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "BORNOVAMUN'26 | Bornova Model United Nations",
     description:
-      "16-17-18 January 2026 | Join Turkey's leading MUN conference in Bornova.",
+      "24-25-26 January 2026 | Join Turkey's leading MUN conference in Bornova.",
     images: ["https://www.bornovamun.org/icon.png"],
   },
 

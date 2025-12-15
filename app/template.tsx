@@ -1,58 +1,18 @@
 // app/template.tsx
 
-"use client"
+"use client";
 
-import { useEffect, useRef } from "react";
-import gsap from "gsap";
-import { usePathname } from "next/navigation";
+import { motion } from "framer-motion";
 
 export default function Template({ children }: { children: React.ReactNode }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const pathname = usePathname()
-  const isFirstRender = useRef(true);
-
-  // Don't show navbar on studio routes
-  if (pathname?.startsWith('/studio')) {
-    return <>
-      {children};
-    </>
-  }
-
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-
-    // Skip first render (like Framer Motion does)
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      gsap.set(containerRef.current, { opacity: 1, y: 0 });
-      return;
-    }
-
-    // Kill any existing animations
-    gsap.killTweensOf(containerRef.current);
-    
-    // Page transition animation
-    gsap.fromTo(
-      containerRef.current,
-      { opacity: 0, y: 20 },
-      { 
-        opacity: 1, 
-        y: 0,
-        duration: 0.4,
-        ease: "power2.out", // Close to cubic-bezier(0.25, 0.1, 0.25, 1.0)
-        delay: 0.05 // Small delay for smoother feel
-      }
-    );
-  }, [pathname]);
-
   return (
-    <div
-      ref={containerRef}
-      className="relative z-10"
-      style={{ scrollbarWidth: "none" }}
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95, filter: "blur(10px)" }}
+      animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }} // Custom bezier for premium feel
+      className="will-change-[transform,opacity,filter]"
     >
       {children}
-    </div>
+    </motion.div>
   );
 }

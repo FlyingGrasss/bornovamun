@@ -55,7 +55,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.8,
     },
     {
-      url: 'https://bornovamun.org/apply/pr', // Added 'pr'
+      url: 'https://bornovamun.org/apply/chair', // Added 'chair'
       lastModified: currentDate,
       changeFrequency: 'weekly',
       priority: 0.8,
@@ -66,13 +66,5 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'weekly',
       priority: 0.8,
     },
-    // --- General Success Page ---
-    {
-      url: 'https://bornovamun.org/success',
-      lastModified: currentDate,
-      changeFrequency: 'never',
-      priority: 0.3,
-    },
-    // Add any other publicly accessible pages here
   ];
 }

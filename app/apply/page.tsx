@@ -11,9 +11,10 @@ export const metadata: Metadata = {
 
 const applications = [
   { id: 'delegate', title: 'Delegate', img: '/applications/delegate.webp', desc: 'Represent a nation and debate global issues.' },
+  { id: 'chair', title: 'Chair', img: '/applications/chair.jpg', desc: 'Lead the debate and manage the committee.' },
+  { id: 'delegation', title: 'Delegation', img: '/applications/delegation.webp', desc: 'Apply as a school or group delegation.' },
   { id: 'press', title: 'Press', img: '/applications/press.webp', desc: 'Capture the moments and report the news.' },
   { id: 'admin', title: 'Admin', img: '/applications/admin.webp', desc: 'Ensure the smooth operation of the conference.' },
-  { id: 'delegation', title: 'Delegation', img: '/applications/delegation.webp', desc: 'Apply as a school or group delegation.' },
 ];
 
 const Apply = () => {
@@ -34,14 +35,14 @@ const Apply = () => {
             >
               {/* Background Image */}
               <div className="relative h-[400px] w-full">
-                 <Image 
+                <Image
                   src={app.img}
                   alt={`Apply ${app.title}`}
                   fill
                   className="object-cover transition-transform duration-700 group-hover:scale-110"
                 />
                 <div className="absolute inset-0 bg-linear-to-t from-[#0A1938] via-[#0A1938]/40 to-transparent opacity-90 transition-opacity duration-300" />
-                
+
                 {/* Border effect */}
                 <div className="absolute inset-0 border-4 border-transparent group-hover:border-[hsl(42,72%,52%)] transition-colors duration-300 rounded-3xl z-20 pointer-events-none" />
               </div>
@@ -52,13 +53,13 @@ const Apply = () => {
                   {app.title}
                 </h2>
                 <p className="text-gray-300 mb-6 translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500">
-                    {app.desc}
+                  {app.desc}
                 </p>
-                
+
                 <span className="flex items-center gap-2 text-white font-medium group-hover:gap-4 transition-all duration-300">
-                  Application Form 
+                  Application Form
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-5 h-5">
-                    <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </span>
               </div>
