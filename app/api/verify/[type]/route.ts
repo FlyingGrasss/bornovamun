@@ -6,29 +6,46 @@ import { google } from 'googleapis';
 import getMessage from '@/lib/getMessage';
 
 const auth = new google.auth.GoogleAuth({
-  credentials: JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY!),
-  scopes: ['https://www.googleapis.com/auth/spreadsheets']
+  credentials: JSON.parse(
+    process.env.GOOGLE_SERVICE_ACCOUNT_KEY!
+  ),
+  scopes: [
+    'https://www.googleapis.com/auth/spreadsheets'
+  ]
 });
 
 const getSheetId = (type: string) => {
   switch (type) {
-    case 'delegate': return process.env.GOOGLE_SHEET_ID_DELEGATE;
-    case 'press': return process.env.GOOGLE_SHEET_ID_PRESS;
-    case 'chair': return process.env.GOOGLE_SHEET_ID_CHAIR;
-    case 'admin': return process.env.GOOGLE_SHEET_ID_ADMIN;
-    case 'delegation': return process.env.GOOGLE_SHEET_ID_DELEGATION;
-    default: return null;
+    case 'delegate':
+      return process.env.GOOGLE_SHEET_ID_DELEGATE;
+    case 'press':
+      return process.env.GOOGLE_SHEET_ID_PRESS;
+    case 'chair':
+      return process.env.GOOGLE_SHEET_ID_CHAIR;
+    case 'admin':
+      return process.env.GOOGLE_SHEET_ID_ADMIN;
+    case 'delegation':
+      return process.env.GOOGLE_SHEET_ID_DELEGATION;
+    default:
+      return null;
   }
-}
+};
 
-export async function POST(request: Request, { params }: { params: Promise<{ type: string }> }) {
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ type: string }> }
+) {
   try {
     const { type } = await params;
     const data = await request.json();
     const { email, code, lang = 'en', ...formData } = data;
     const sheetId = getSheetId(type);
 
-    if (!sheetId) return NextResponse.json({ error: 'Invalid type' }, { status: 400 });
+    if (!sheetId)
+      return NextResponse.json(
+        { error: 'Invalid type' },
+        { status: 400 }
+      );
 
     const { data: codeData, error } = await supabase
       .from('verification_codes')
@@ -52,30 +69,30 @@ export async function POST(request: Request, { params }: { params: Promise<{ typ
       if (Array.isArray(formData.delegates)) {
         // 1. Add the Delegation Header Row
         values.push([
-          formData.school,               // Column 1: School Name
-          formData.numberOfDelegates,    // Column 2: Delegate Count
-          email                          // Column 3: Advisor/delegation Email
+          formData.school, // Column 1: School Name
+          formData.numberOfDelegates, // Column 2: Delegate Count
+          email // Column 3: Advisor/delegation Email
         ]);
 
         // 2. Add each Delegate Row
         formData.delegates.forEach((d: any) => {
           values.push([
-            d.fullName,                  // 1: Delegate Full Name
-            d.birthDate,                 // 2: Birth Date
-            d.nationalId,                // 3: TC
-            d.gender,                    // 4: Gender
+            d.fullName, // 1: Delegate Full Name
+            d.birthDate, // 2: Birth Date
+            d.nationalId, // 3: TC
+            d.gender, // 4: Gender
             d.committeePreferences?.[0] || '', // 5: Committee 1
             d.committeePreferences?.[1] || '', // 6: Committee 2
             d.committeePreferences?.[2] || '', // 7: Committee 3
-            d.englishLevel,              // 8: English Level
-            d.dietaryPreferences,        // 9: Diet
-            d.email,                     // 10: Email
-            d.phoneNumber,               // 11: Phone Number
-            d.city,                      // 12: City
-            d.grade,                     // 13: Grade
-            d.experience,                // 14: Experience
-            d.motivationLetter,          // 15: Motivation Letter
-            d.additionalInfo             // 16: Additional Info
+            d.englishLevel, // 8: English Level
+            d.dietaryPreferences, // 9: Diet
+            d.email, // 10: Email
+            d.phoneNumber, // 11: Phone Number
+            d.city, // 12: City
+            d.grade, // 13: Grade
+            d.experience, // 14: Experience
+            d.motivationLetter, // 15: Motivation Letter
+            d.additionalInfo // 16: Additional Info
           ]);
         });
       }
@@ -89,7 +106,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ typ
         formData.gender,
         formData.school,
         formData.city,
-        formData.grade,
+        formData.grade
       ];
 
       let specifics: any[] = [];
@@ -118,7 +135,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ typ
           formData.experience,
           formData.motivationLetter,
           formData.chairAnswer1 || '', // GA Question
-          formData.chairAnswer2 || ''  // Procedure Question
+          formData.chairAnswer3 || '', // Crisis Directive Question
+          formData.chairAnswer2 || '' // Procedure Question
         ];
       } else {
         specifics = [
@@ -143,13 +161,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ typ
       requestBody: { values }
     });
 
-    await supabase.from('verification_codes').delete().eq('email', email);
+    await supabase
+      .from('verification_codes')
+      .delete()
+      .eq('email', email);
 
     return NextResponse.json(
-      { message: getMessage(lang, 'verification_successful') },
+      {
+        message: getMessage(lang, 'verification_successful')
+      },
       { status: 200 }
     );
-
   } catch (error) {
     console.error('Verification Error:', error);
     return NextResponse.json(
