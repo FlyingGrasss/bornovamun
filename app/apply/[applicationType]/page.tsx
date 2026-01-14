@@ -7,9 +7,9 @@ import ApplicationForm from '@/components/ApplicationForm';
 export async function generateStaticParams() {
   return [
     { applicationType: 'delegate' },
-    { applicationType: 'press' },
+    //{ applicationType: 'press' },
     { applicationType: 'chair' },
-    { applicationType: 'admin' },
+    //{ applicationType: 'admin' },
     { applicationType: 'delegation' },
   ];
 }
@@ -25,7 +25,7 @@ export default async function Page({ params }: PageProps) {
   const { applicationType } = await params;
 
   // Double check valid types
-  const validTypes = ['delegate', 'press', 'chair', 'admin', 'delegation'];
+  const validTypes = ['delegate', 'chair', 'delegation'];
   if (!validTypes.includes(applicationType)) {
     notFound();
   }
