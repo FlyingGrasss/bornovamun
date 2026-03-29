@@ -13,7 +13,7 @@ const Footer = () => {
   }
   
   return (
-    <h3 className="text-white text-center min-[1800px]:text-xl">
+    <p className="text-white text-center min-[1800px]:text-xl">
       © 2026 BORNOVAMUN, All Rights Reserved.{" "}
       <br className="sm:hidden" />{" "}
       <a
@@ -23,7 +23,7 @@ const Footer = () => {
       >
         Emre Bozkurt
       </a>
-    </h3>
+    </p>
   )
 }
 
