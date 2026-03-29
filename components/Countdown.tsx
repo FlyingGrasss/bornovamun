@@ -12,7 +12,7 @@ interface TimeLeft {
 }
 
 const Countdown = () => {
-  const targetDate = new Date("2026-04-24T00:00:00").getTime();
+  const targetDate = new Date("2026-01-24T00:00:00").getTime();
 
   // 1. Initialize with a "safe" default state that will be the same on Server and Client
   const [timeLeft, setTimeLeft] = useState<TimeLeft>({
